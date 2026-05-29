@@ -1,0 +1,155 @@
+From d3ce19b1fb23ce5d3c7c897c5eaeaf210284fa07 Mon Sep 17 00:00:00 2001
+From: Andrey Leonchikov <andreil499@gmail.com>
+Date: Sun, 10 May 2026 09:54:19 +0200
+Subject: [PATCH 1/2] Update to CGAL 6.1.1
+
+Co-authored-by: Copilot <copilot@github.com>
+---
+ deps/CGAL/CGAL.cmake                          |  6 ++---
+ scripts/flatpak/com.orcaslicer.OrcaSlicer.yml |  6 ++---
+ src/libslic3r/CutSurface.cpp                  | 22 +++++++++----------
+ 3 files changed, 17 insertions(+), 17 deletions(-)
+
+diff --git a/deps/CGAL/CGAL.cmake b/deps/CGAL/CGAL.cmake
+index ec77e0ebaed..862bad3236b 100644
+--- a/deps/CGAL/CGAL.cmake
++++ b/deps/CGAL/CGAL.cmake
+@@ -5,10 +5,10 @@ endif ()
+ orcaslicer_add_cmake_project(
+     CGAL
+     # GIT_REPOSITORY https://github.com/CGAL/cgal.git
+-    # GIT_TAG        3654f780ae0c64675cabaef0e5ddaf904c48b4b7 # releases/CGAL-5.6.3
++    # GIT_TAG        08b27d3db14039d926c3a89d12955aa28fd55171 # releases/CGAL-6.1.1
+     # For whatever reason, this keeps downloading forever (repeats downloads if finished)
+-    URL      https://github.com/CGAL/cgal/releases/download/v5.6.3/CGAL-5.6.3.zip
+-    URL_HASH SHA256=5d577acb4a9918ccb960491482da7a3838f8d363aff47e14d703f19fd84733d4
++    URL      https://github.com/CGAL/cgal/releases/download/v6.1.1/CGAL-6.1.1.zip
++    URL_HASH SHA256=a47e83555966db53070bc37e2d313ce4de1b78a5ee3d8693369a3e268bcd2b79
+     DEPENDS dep_Boost dep_GMP dep_MPFR
+ )
+ 
+diff --git a/scripts/flatpak/com.orcaslicer.OrcaSlicer.yml b/scripts/flatpak/com.orcaslicer.OrcaSlicer.yml
+index c527938364f..d60ac9b1e7c 100644
+--- a/scripts/flatpak/com.orcaslicer.OrcaSlicer.yml
++++ b/scripts/flatpak/com.orcaslicer.OrcaSlicer.yml
+@@ -229,10 +229,10 @@ modules:
+         sha256: 9ad62c7dc910303cd384ff8f1f4767a655124980bb6d8650fe62c815a231bb7b
+         dest: external-packages/MPFR
+ 
+-      # CGAL 5.6.3
++      # CGAL 6.1.1
+       - type: file
+-        url: https://github.com/CGAL/cgal/releases/download/v5.6.3/CGAL-5.6.3.zip
+-        sha256: 5d577acb4a9918ccb960491482da7a3838f8d363aff47e14d703f19fd84733d4
++        url: https://github.com/CGAL/cgal/releases/download/v6.1.1/CGAL-6.1.1.zip
++        sha256: a47e83555966db53070bc37e2d313ce4de1b78a5ee3d8693369a3e268bcd2b79
+         dest: external-packages/CGAL
+ 
+       # NLopt v2.5.0
+diff --git a/src/libslic3r/CutSurface.cpp b/src/libslic3r/CutSurface.cpp
+index 606a5b8aaae..83872690de2 100644
+--- a/src/libslic3r/CutSurface.cpp
++++ b/src/libslic3r/CutSurface.cpp
+@@ -1409,8 +1409,8 @@ priv::CutAOIs priv::cut_from_model(CutMesh                &cgal_model,
+     // detect anomalities in visitor.
+     bool is_valid = true;
+     // NOTE: map are created when convert shapes to cgal model
+-    const EdgeShapeMap& edge_shape_map = cgal_shape.property_map<EI, IntersectingElement>(edge_shape_map_name).first;
+-    const FaceShapeMap& face_shape_map = cgal_shape.property_map<FI, IntersectingElement>(face_shape_map_name).first;
++    const EdgeShapeMap& edge_shape_map = cgal_shape.property_map<EI, IntersectingElement>(edge_shape_map_name).value();
++    const FaceShapeMap& face_shape_map = cgal_shape.property_map<FI, IntersectingElement>(face_shape_map_name).value();
+     Visitor visitor{cgal_model, cgal_shape, edge_shape_map, face_shape_map, vert_shape_map, &is_valid};
+ 
+     // a property map containing the constrained-or-not status of each edge
+@@ -1559,8 +1559,8 @@ void priv::collect_surface_data(std::queue<FI>  &process,
+ 
+ void priv::create_reduce_map(ReductionMap &reduction_map, const CutMesh &mesh)
+ {
+-    const VertexShapeMap &vert_shape_map = mesh.property_map<VI, const IntersectingElement*>(vert_shape_map_name).first;
+-    const EdgeBoolMap &ecm = mesh.property_map<EI, bool>(is_constrained_edge_name).first;
++    const VertexShapeMap &vert_shape_map = mesh.property_map<VI, const IntersectingElement*>(vert_shape_map_name).value();
++    const EdgeBoolMap &ecm = mesh.property_map<EI, bool>(is_constrained_edge_name).value();
+ 
+     // check if vertex was made by edge_2 which is diagonal of quad
+     auto is_reducible_vertex = [&vert_shape_map](VI reduction_from) -> bool {
+@@ -1745,10 +1745,10 @@ priv::VDistances priv::calc_distances(const SurfacePatches &patches,
+     for (const SurfacePatch &patch : patches) {
+         // map is created during intersection by corefine visitor
+         const VertexShapeMap &vert_shape_map = 
+-            models[patch.model_id].property_map<VI, const IntersectingElement *>(vert_shape_map_name).first;
++            models[patch.model_id].property_map<VI, const IntersectingElement *>(vert_shape_map_name).value();
+         uint32_t patch_index = &patch - &patches.front();
+         // map is created during patch creation / dividing
+-        const CvtVI2VI& cvt = patch.mesh.property_map<VI, VI>(patch_source_name).first;
++        const CvtVI2VI& cvt = patch.mesh.property_map<VI, VI>(patch_source_name).value();
+         // for each point on outline
+         for (const Loop &loop : patch.loops) 
+         for (const VI &vi_patch : loop) {
+@@ -2770,7 +2770,7 @@ using BBS = std::vector<BoundingBoxf3>;
+ BBS create_bbs(const VCutAOIs &cuts, const CutMeshes &cut_models);
+ 
+ using Primitive = CGAL::AABB_face_graph_triangle_primitive<CutMesh>;
+-using Traits    = CGAL::AABB_traits<EpicKernel, Primitive>;
++using Traits    = CGAL::AABB_traits_3<EpicKernel, Primitive>;
+ using Ray       = EpicKernel::Ray_3;
+ using Tree      = CGAL::AABB_tree<Traits>;
+ using Trees     = std::vector<Tree>;
+@@ -2924,7 +2924,7 @@ bool priv::is_patch_inside_of_model(const SurfacePatch &patch,
+ uint32_t priv::get_shape_point_index(const CutAOI &cut, const CutMesh &model)
+ {
+     // map is created during intersection by corefine visitor
+-    const VertexShapeMap &vert_shape_map = model.property_map<VI, const IntersectingElement *>(vert_shape_map_name).first;
++    const VertexShapeMap &vert_shape_map = model.property_map<VI, const IntersectingElement *>(vert_shape_map_name).value();
+     // for each half edge of outline
+     for (HI hi : cut.second) {
+         VI vi = model.source(hi);
+@@ -2949,7 +2949,7 @@ priv::SurfacePatch priv::separate_patch(const std::vector<FI>& fis,
+     patch_new.model_id     = patch.model_id;
+     patch_new.shape_id     = patch.shape_id;
+     // fix cvt
+-    CvtVI2VI cvt = patch_new.mesh.property_map<VI, VI>(patch_source_name).first;
++    CvtVI2VI cvt = patch_new.mesh.property_map<VI, VI>(patch_source_name).value();
+     for (VI &vi : cvt) {
+         if (!vi.is_valid()) continue;
+         vi = cvt_from[vi];
+@@ -2969,7 +2969,7 @@ void priv::divide_patch(size_t i, SurfacePatchesEx &patches)
+     std::string patch_number_name = "f:patch_number";
+     CutMesh::Property_map<FI,bool> is_processed = cm.add_property_map<FI, bool>(patch_number_name, false).first;
+     
+-    const CvtVI2VI& cvt_from = patch.mesh.property_map<VI, VI>(patch_source_name).first;
++    const CvtVI2VI& cvt_from = patch.mesh.property_map<VI, VI>(patch_source_name).value();
+ 
+     std::vector<FI> fis;
+     fis.reserve(cm.faces().size());
+@@ -3156,7 +3156,7 @@ bool priv::is_over_whole_expoly(const CutAOI    &cutAOI,
+                                 const CutMesh   &mesh)
+ {
+     // NonInterupted contour is without other point and contain all from shape    
+-    const VertexShapeMap &vert_shape_map = mesh.property_map<VI, const IntersectingElement*>(vert_shape_map_name).first;
++    const VertexShapeMap &vert_shape_map = mesh.property_map<VI, const IntersectingElement*>(vert_shape_map_name).value();
+     for (HI hi : cutAOI.second) { 
+         const IntersectingElement *ie_s = vert_shape_map[mesh.source(hi)];
+         const IntersectingElement *ie_t = vert_shape_map[mesh.target(hi)];
+
+From bb417696184aba16939e51a0fff9a82637734a2d Mon Sep 17 00:00:00 2001
+From: Andrey Leonchikov <andreil499@gmail.com>
+Date: Wed, 13 May 2026 11:07:06 +0200
+Subject: [PATCH 2/2] Sync deps with mainline.
+
+---
+ deps/CGAL/CGAL.cmake | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/deps/CGAL/CGAL.cmake b/deps/CGAL/CGAL.cmake
+index 862bad3236b..683cc2fcbce 100644
+--- a/deps/CGAL/CGAL.cmake
++++ b/deps/CGAL/CGAL.cmake
+@@ -9,7 +9,7 @@ orcaslicer_add_cmake_project(
+     # For whatever reason, this keeps downloading forever (repeats downloads if finished)
+     URL      https://github.com/CGAL/cgal/releases/download/v6.1.1/CGAL-6.1.1.zip
+     URL_HASH SHA256=a47e83555966db53070bc37e2d313ce4de1b78a5ee3d8693369a3e268bcd2b79
+-    DEPENDS dep_Boost dep_GMP dep_MPFR
++    DEPENDS dep_Boost dep_Eigen dep_GMP dep_MPFR
+ )
+ 
+ include(GNUInstallDirs)

@@ -1,0 +1,15 @@
+--- a/src/libslic3r/CMakeLists.txt
++++ b/src/libslic3r/CMakeLists.txt
+@@ -545,11 +545,7 @@
+ find_package(draco REQUIRED)
+ 
+ set(OCCT_LIBS
+-    TKXDESTEP
+-    TKSTEP
+-    TKSTEP209
+-    TKSTEPAttr
+-    TKSTEPBase
++    TKDESTEP
+     TKXCAF
+     TKXSBase
+     TKVCAF

@@ -1,0 +1,68 @@
+From 4aa2646eb0ea4325d502f70c0883547ccb3afb02 Mon Sep 17 00:00:00 2001
+From: LeCrabe <barcelo.mathieu@gmail.com>
+Date: Mon, 5 Jan 2026 11:28:41 +0100
+Subject: [PATCH] fix(build): remove unused std::vector overload causing
+ ambiguity with GCC 15
+
+Remove the unused set_values(const std::vector<std::string>&) overload
+from Choice class. This eliminates the ambiguous overload error with
+GCC 15 and wxWidgets 3.2.4+ where brace-enclosed initializer lists
+could match both std::vector and wxArrayString constructors.
+
+The removed function was marked as needed for _update_serial_ports()
+but this function no longer exists in the codebase.
+
+Suggested-by: frmdstryr
+Fixes #11802
+
+---
+Previous approach (explicit casts at call sites) was replaced by this
+cleaner solution that removes dead code instead of working around it.
+---
+ src/slic3r/GUI/Field.cpp | 20 --------------------
+ src/slic3r/GUI/Field.hpp |  1 -
+ 2 files changed, 21 deletions(-)
+
+diff --git a/src/slic3r/GUI/Field.cpp b/src/slic3r/GUI/Field.cpp
+index 55f754e91a6..2006c83b226 100644
+--- a/src/slic3r/GUI/Field.cpp
++++ b/src/slic3r/GUI/Field.cpp
+@@ -1592,26 +1592,6 @@ void Choice::set_value(const boost::any& value, bool change_event)
+ 	m_disable_change_event = false;
+ }
+ 
+-//! it's needed for _update_serial_ports()
+-void Choice::set_values(const std::vector<std::string>& values)
+-{
+-	if (values.empty())
+-		return;
+-	m_disable_change_event = true;
+-
+-// 	# it looks that Clear() also clears the text field in recent wxWidgets versions,
+-// 	# but we want to preserve it
+-	auto ww = dynamic_cast<choice_ctrl*>(window);
+-	auto value = ww->GetValue();
+-	ww->Clear();
+-	ww->Append("");
+-	for (const auto &el : values)
+-		ww->Append(wxString(el));
+-	ww->SetValue(value);
+-
+-	m_disable_change_event = false;
+-}
+-
+ void Choice::set_values(const wxArrayString &values)
+ {
+ 	if (values.empty())
+diff --git a/src/slic3r/GUI/Field.hpp b/src/slic3r/GUI/Field.hpp
+index b2e615842a2..97d0287bcd7 100644
+--- a/src/slic3r/GUI/Field.hpp
++++ b/src/slic3r/GUI/Field.hpp
+@@ -448,7 +448,6 @@ class Choice : public Field {
+ 	void			set_selection();
+ 	void			set_value(const std::string& value, bool change_event = false);
+ 	void			set_value(const boost::any& value, bool change_event = false) override;
+-	void			set_values(const std::vector<std::string> &values);
+ 	void			set_values(const wxArrayString &values);
+ 	boost::any&		get_value() override;
+ 

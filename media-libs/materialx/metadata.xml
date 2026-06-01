@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+  <use>
+    <flag name="graph-editor">Build the Graph Editor for visualizing, creating, and editing MaterialX graphs</flag>
+    <flag name="opencolorio">Support for custom OpenColorIO color spaces and transforms</flag>
+    <flag name="openimageio">Extend the set of supported image formats</flag>
+    <flag name="viewer">Build the Viewer which leverages shader generation to build GLSL shaders from MaterialX graphs, rendering the results using the NanoGUI framework</flag>
+  </use>
+</pkgmetadata>

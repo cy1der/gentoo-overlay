@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+  <use>
+    <flag name="alembic">Enable the Alembic plugin</flag>
+    <flag name="draco">Enable the Draco plugin</flag>
+    <flag name="embree">Enable the Embree plugin, contains an example rendering backend for Hydra and usdview</flag>
+    <flag name="hdf">Support for Alembic files using the HDF5 backend</flag>
+    <flag name="imaging">Enable the Hydra component</flag>
+    <flag name="materialx">Enable MaterialX support</flag>
+    <flag name="opencolorio">Enable the OpenolorIO plugin</flag>
+    <flag name="openimageio">Enable the OpenImageIO plugin</flag>
+    <flag name="osl">Enable OpenShadingLanguage support</flag>
+    <flag name="ptex">Enable Ptex support</flag>
+    <flag name="tools">Install command-line tools for validating and manipulating USD files</flag>
+    <flag name="usdview">Install usdview for viewing, navigating, and debugging USD stages</flag>
+  </use>
+</pkgmetadata>

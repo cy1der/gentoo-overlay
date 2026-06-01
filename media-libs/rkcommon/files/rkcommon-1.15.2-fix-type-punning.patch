@@ -1,0 +1,11 @@
+--- a/rkcommon/utility/random.h
++++ b/rkcommon/utility/random.h
+@@ -38,7 +38,8 @@
+     inline float pcg32_biased_float_distribution::operator()()
+     {
+       const unsigned scaleBits = 0x2F800000;  // 2^(-32)
+-      const float scale        = *(float *)&scaleBits;
++      float scale;
++      std::memcpy(&scale, &scaleBits, sizeof(scale));
+       return (scale * rng()) * diff + lower;
+     }

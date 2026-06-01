@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+  <longdescription>
+    F3D (pronounced `/fɛd/`) is a fast and minimalist 3D viewer desktop application.
+    It supports many file formats, from digital content to scientific datasets (including
+    glTF, USD, STL, STEP, PLY, OBJ, FBX, Alembic), can show animations and support
+    thumbnails and many rendering and texturing options including real time physically
+    based rendering and raytracing. It is fully controllable from the command line and
+    support configuration files. It can provide thumbnails, support interactive hotkeys, 
+    drag and drop and integration into file managers. F3D also contains the libf3d, a
+    simple library to render meshes, with a C++17 API, C, Python, Java and Javascript Bindings.
+  </longdescription>
+  <use>
+    <flag name="alembic">Support for ABC file format</flag>
+    <flag name="assimp">Support for FBX, DAE, OFF, DXF, X and 3MF file formats</flag>
+    <flag name="clipboard">Support for clipboard interaction using provided clip (experimental)</flag>
+    <flag name="draco">Support for DRC file format</flag>
+    <flag name="hdf">Support for VTKHDF (.vtkhdf), ExodusII (.ex2), and NetCDF (.nc) file formats</flag>
+    <flag name="imgui">Support for ImGui widgets</flag>
+    <flag name="opencascade">Support for STEP, IGES, BREP, and XBF file formats</flag>
+    <flag name="openvdb">Support for VDB file format</flag>
+    <flag name="pdal">Support for Point Cloud file formats</flag>
+    <flag name="raytracing">Support for raytracing rendering</flag>
+    <flag name="usd">Support for USD file format</flag>
+    <flag name="web-ifc">Support for IFC file format</flag>
+  </use>
+</pkgmetadata>

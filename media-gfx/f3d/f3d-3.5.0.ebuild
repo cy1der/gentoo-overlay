@@ -18,13 +18,13 @@ EGIT_LFS_CLONE_TYPE="single"
 LICENSE="BSD-3-Clause"
 SLOT="0"
 KEYWORDS="~amd64"
-IUSE="raytracing openexr +imgui webp clipboard +hdf opencascade assimp alembic draco usd openvdb pdal web-ifc python java cxx test"
+IUSE="cuda raytracing openexr +imgui webp clipboard +hdf opencascade assimp alembic draco usd openvdb pdal web-ifc python java cxx test"
 REQUIRED_USE="python? ( ${PYTHON_REQUIRED_USE} )"
 
 RESTRICT="!test? ( test )"
 
 RDEPEND="
-    >=sci-libs/vtk-9.4.0[rendering,openvdb?,pdal?,opencascade?]
+    >=sci-libs/vtk-9.4.0[rendering,cuda?,openvdb?,pdal?,opencascade?]
     raytracing? ( >=sci-libs/vtk-9.4.0[ospray] )
     hdf? ( >=sci-libs/vtk-9.4.0[netcdf] )
     assimp? ( >=media-libs/assimp-5.4.0 )
@@ -50,6 +50,8 @@ DEPEND="
     java? ( >=virtual/jdk-17:* )
 "
 
+BDEPEND="cuda? ( dev-util/nvidia-cuda-toolkit )"
+
 pkg_setup() {
     use python && python-single-r1_pkg_setup
     use java && java-pkg-opt-2_pkg_setup
@@ -57,7 +59,7 @@ pkg_setup() {
 
 src_prepare() {
     cmake_src_prepare
-    cuda_src_prepare
+    use cuda && cuda_src_prepare
 
     sed -i -E 's/int test_([a-zA-Z0-9_]+)\((void)?\)/int test_\1(int argc, char* argv[])/g' c/testing/*.c || die
 
@@ -133,7 +135,7 @@ src_install() {
             mkdir -p "${ED}/usr/lib" || die
             mv "${ED}/usr/${libdir}/${EPYTHON}" "${ED}/usr/lib/" || die
         fi
-        
+
         python_optimize
     fi
 }

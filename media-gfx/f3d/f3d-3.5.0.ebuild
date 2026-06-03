@@ -82,17 +82,28 @@ EOF
 EOF
 
     cat <<-EOF > "${T}/cmake/GentooInject.cmake" || die
-		find_package(OpenGL QUIET)
-		find_package(glm QUIET)
-		find_package(Ptex QUIET)
+        if(NOT GENTOO_INJECT_MACRO_SET)
+            set(GENTOO_INJECT_MACRO_SET TRUE CACHE INTERNAL "Prevent macro recursion")
+            macro(find_package _name)
+                if("\${_name}" STREQUAL "PEGTL" AND TARGET taocpp::pegtl)
+                    set(PEGTL_FOUND TRUE)
+                else()
+                    _find_package(\${ARGV})
+                endif()
+            endmacro()
+        endif()
+
+        find_package(OpenGL QUIET)
+        find_package(glm QUIET)
+        find_package(Ptex QUIET)
         find_package(spdlog QUIET)
         find_package(FastFloat QUIET)
-		if(TARGET Ptex::Ptex AND NOT TARGET Ptex::Ptex_dynamic)
-			add_library(Ptex::Ptex_dynamic ALIAS Ptex::Ptex)
-		endif()
+        if(TARGET Ptex::Ptex AND NOT TARGET Ptex::Ptex_dynamic)
+            add_library(Ptex::Ptex_dynamic ALIAS Ptex::Ptex)
+        endif()
         if(TARGET spdlog::spdlog AND NOT TARGET spdlog::spdlog_header_only)
-			add_library(spdlog::spdlog_header_only ALIAS spdlog::spdlog)
-		endif()
+            add_library(spdlog::spdlog_header_only ALIAS spdlog::spdlog)
+        endif()
 EOF
 }
 

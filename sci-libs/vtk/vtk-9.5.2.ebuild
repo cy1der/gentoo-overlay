@@ -1,11 +1,7 @@
 # Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-#####################################################################################################################################
-#																																  	#
-# This is a copy of sci-libs/vtk-9.5.2::gentoo with added OSPRay support, credits to the original maintainer(s) for their hard work #
-#																																	#
-#####################################################################################################################################
+# This is a copy of sci-libs/vtk-9.5.2::gentoo with added OSPRay support
 
 EAPI=8
 

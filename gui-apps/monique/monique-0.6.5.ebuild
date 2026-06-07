@@ -12,7 +12,7 @@ DESCRIPTION="Graphical monitor configurator for Hyprland, Sway and Niri"
 HOMEPAGE="https://github.com/ToRvaLDz/monique"
 SRC_URI="https://github.com/ToRvaLDz/monique/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz"
 
-LICENSE="GPL-3.0-or-later"
+LICENSE="GPL-3+"
 SLOT="0"
 KEYWORDS="~amd64"
 IUSE="systemd +udev"

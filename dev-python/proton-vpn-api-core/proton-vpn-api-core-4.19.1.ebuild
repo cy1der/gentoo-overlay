@@ -30,10 +30,19 @@ PATCHES=(
 
 BDEPEND="test? ( dev-python/pytest-asyncio[${PYTHON_USEDEP}] )"
 
+# sentry-sdk is only imported when crash reporting is enabled
 RDEPEND="
+	net-misc/networkmanager[introspection]
+	net-vpn/networkmanager-openvpn
 	dev-python/cryptography[${PYTHON_USEDEP}]
 	dev-python/distro[${PYTHON_USEDEP}]
+	dev-python/fido2[${PYTHON_USEDEP}]
+	dev-python/jinja2[${PYTHON_USEDEP}]
+	dev-python/packaging[${PYTHON_USEDEP}]
 	>=dev-python/proton-core-0.5.0[${PYTHON_USEDEP}]
+	>=dev-python/proton-vpn-local-agent-1.5.0[${PYTHON_USEDEP}]
+	dev-python/pycairo[${PYTHON_USEDEP}]
+	dev-python/pygobject[${PYTHON_USEDEP}]
 	dev-python/pynacl[${PYTHON_USEDEP}]
 "
 

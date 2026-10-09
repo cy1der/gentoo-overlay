@@ -1,0 +1,57 @@
+--- a/proton/vpn/backend/networkmanager/killswitch/default/nmkillswitch.py
++++ b/proton/vpn/backend/networkmanager/killswitch/default/nmkillswitch.py
+@@ -101,25 +101,4 @@
+             logger.error("NetworkManager is not running.")
+             return False
+ 
+-        # libnetplan0 is the first version that is present in Ubuntu 22.04. In Ubuntu 24.04
+-        # the package name changes to libnetplan1, and it's not compatible with this kill
+-        # switch implementation when IPv6 is disabled via the ipv6.disabled kernel option.
+-        try:
+-            result = subprocess.run(
+-                ["/usr/bin/apt", "show", "libnetplan1"],
+-                capture_output=True,
+-                check=True, shell=False
+-            )  # nosec B603:subprocess_without_shell_equals_true
+-        except (FileNotFoundError, subprocess.CalledProcessError):
+-            pass
+-        else:
+-            stdout_decoded = result.stdout.decode("utf8").split("\n")
+-            for package_info_line in stdout_decoded:
+-                if package_info_line.startswith("Version: 1.0.0"):
+-                    logger.warning(
+-                        "Kill switch is not compatible with libnetplan1 v1.0.0. "
+-                        "Please upgrade libnetplan1 package to v1.1.1"
+-                    )
+-                    break
+-
+         return True
+--- a/proton/vpn/backend/networkmanager/killswitch/wireguard/wgkillswitch.py
++++ b/proton/vpn/backend/networkmanager/killswitch/wireguard/wgkillswitch.py
+@@ -114,25 +114,4 @@
+             logger.error("NetworkManager is not running.")
+             return False
+ 
+-        # libnetplan0 is the first version that is present in Ubuntu 22.04. In Ubuntu 24.04
+-        # the package name changes to libnetplan1, and it's not compatible with this kill
+-        # switch implementation when IPv6 is disabled via the ipv6.disabled kernel option.
+-        try:
+-            result = subprocess.run(
+-                ["/usr/bin/apt", "show", "libnetplan1"],
+-                capture_output=True,
+-                check=True, shell=False
+-            )  # nosec B603:subprocess_without_shell_equals_true
+-        except (FileNotFoundError, subprocess.CalledProcessError):
+-            pass
+-        else:
+-            stdout_decoded = result.stdout.decode("utf8").split("\n")
+-            for package_info_line in stdout_decoded:
+-                if package_info_line.startswith("Version: 1.0.0"):
+-                    logger.warning(
+-                        "Kill switch is not compatible with libnetplan1 v1.0.0. "
+-                        "Please upgrade libnetplan1 package to v1.1.1"
+-                    )
+-                    break
+-
+         return True
+Only in b/proton/vpn/backend/networkmanager/killswitch/wireguard: wgkillswitch.py.orig

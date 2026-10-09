@@ -1,0 +1,16 @@
+--- a/proton/vpn/daemon/split_tunneling/apps/socket_monitor.py
++++ b/proton/vpn/daemon/split_tunneling/apps/socket_monitor.py
+@@ -77,7 +77,12 @@
+             return
+ 
+         logger.info("Starting socket monitor (with fwmark %s)", FWMARK_VALUE)
+-        self._cgroup = os.open("/sys/fs/cgroup/user.slice", os.O_RDONLY)
++        # user.slice only exists with systemd, otherwise attach to the root cgroup.
++        # Only sockets created by the PIDs in pid_map are marked either way.
++        cgroup_path = "/sys/fs/cgroup/user.slice"
++        if not os.path.isdir(cgroup_path):
++            cgroup_path = "/sys/fs/cgroup"
++        self._cgroup = os.open(cgroup_path, os.O_RDONLY)
+ 
+         # attach the ST eBPF function to the cgroup/sock_create event
+         # of the root user cgroup

@@ -1,0 +1,13 @@
+#!/sbin/openrc-run
+# Copyright 2026 Gentoo Authors
+# Distributed under the terms of the GNU General Public License v2
+
+description="Proton VPN daemon providing split tunneling"
+supervisor="supervise-daemon"
+command="@PYTHON@"
+command_args="-m proton.vpn.daemon"
+
+depend() {
+	need dbus
+	after net
+}

@@ -1,0 +1,23 @@
+--- a/rpmbuild/SOURCES/dbus.conf
++++ b/rpmbuild/SOURCES/dbus.conf
+@@ -1,9 +1,10 @@
+ <!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+ <busconfig>
+-    <policy context="default">
++    <policy user="root">
+         <allow own="me.proton.vpn.split_tunneling"/>
+-
++    </policy>
++    <policy context="default">
+         <allow send_destination="me.proton.vpn.split_tunneling"/>
+         <allow receive_sender="me.proton.vpn.split_tunneling"/>
+         <allow send_interface="org.freedesktop.DBus.Introspectable"/>
+--- a/rpmbuild/SOURCES/dbus.service
++++ b/rpmbuild/SOURCES/dbus.service
+@@ -2,4 +2,4 @@
+ Name=me.proton.vpn.split_tunneling
+ Exec=/bin/false
+ User=root
+-SystemdService=proton.VPN.service
++SystemdService=me.proton.vpn.split_tunneling.service

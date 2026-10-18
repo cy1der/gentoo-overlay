@@ -167,6 +167,7 @@ def cmd_check(args):
 
     config = tomllib.loads(CONFIG.read_text())
     plan = {"bump": [], "issue": []}
+    open_prs = api("GET", f"/repos/{REPO}/pulls?state=open&per_page=100") or []
     for cp, event in sorted(nvchecker_results(args.only).items()):
         entry = config.get(cp, {})
         old, _ = latest(cp)
@@ -192,7 +193,20 @@ def cmd_check(args):
             "url": event.get("url") or "",
             "slug": cp.replace("/", "_"),
             "key": f"{cp.replace('/', '_')}-{new}",
+            # An open PR for an older version: build on its branch so fixes
+            # made there (by Claude or by hand) carry over
+            "base": "",
+            "base_pr": 0,
+            "base_ai": False,
         }
+        for pr in open_prs:
+            head_repo = (pr["head"]["repo"] or {}).get("full_name")  # None for deleted forks
+            if pr["head"]["ref"].startswith(f"autobump/{cp}-") and head_repo == REPO:
+                item["base"] = pr["head"]["ref"]
+                item["base_pr"] = pr["number"]
+                item["base_ai"] = any(label["name"] == "ai-assisted" for label in pr["labels"])
+                log(f"{cp}: building on #{pr['number']} ({item['base']})")
+                break
         log(f"{cp}: {old} -> {new} ({mode})")
         plan["bump" if mode != "issue" else "issue"].append(item)
     out = json.dumps(plan, indent=2)
@@ -211,7 +225,29 @@ def cmd_bump(args):
         sys.exit(f"{dst.name} already exists")
     shutil.copy2(src, dst)
     log(f"{src.name} -> {dst.name}")
+    align_with_main(args.atom, dst)
     manifest(args.atom)
+
+
+def align_with_main(cp, keep):
+    """Make the bump add only `keep` relative to main.
+
+    On top of an open PR's branch, this removes the version that PR added
+    (it is superseded) and restores ebuilds the PR dropped, so dropping old
+    versions stays a separate commit. Other changes on the branch are kept.
+    """
+    try:
+        listing = run("git", "ls-tree", "--name-only", "origin/main", f"{cp}/", capture=True)
+    except subprocess.CalledProcessError:
+        return
+    on_main = {Path(line).name for line in listing.splitlines() if line.endswith(".ebuild")}
+    here = {path.name for path in (ROOT / cp).glob("*.ebuild")}
+    for name in sorted(here - on_main - {keep.name}):
+        (ROOT / cp / name).unlink()
+        log(f"removed superseded {name}")
+    for name in sorted(on_main - here):
+        run("git", "checkout", "origin/main", "--", f"{cp}/{name}")
+        log(f"restored {name} from main")
 
 
 def cmd_drop(args):
@@ -274,13 +310,25 @@ def open_issue(item, body, labels):
         },
     )
     log(f"{item['atom']}: opened issue {issue['html_url']}")
+    close_older_issues(item["atom"], item["new"], issue["number"])
+
+
+def close_older_issues(cp, new, number):
+    """Close open autobump issues for older versions of cp, now superseded by #number."""
+    query = f'repo:{REPO} is:issue is:open label:autobump in:title "{cp}:"'
+    for issue in api("GET", f"/search/issues?q={q(query)}")["items"]:
+        title = issue["title"]
+        if title.startswith(f"{cp}: ") and title.endswith(" available") and title != issue_title(cp, new):
+            api("POST", f"/repos/{REPO}/issues/{issue['number']}/comments", {"body": f"Superseded by #{number}."})
+            api("PATCH", f"/repos/{REPO}/issues/{issue['number']}", {"state": "closed", "state_reason": "not_planned"})
+            log(f"{cp}: closed superseded issue #{issue['number']}")
 
 
 def close_superseded(cp, branch):
     for pr in api("GET", f"/repos/{REPO}/pulls?state=open&per_page=100") or []:
         ref = pr["head"]["ref"]
         if ref.startswith(f"autobump/{cp}-") and ref != branch:
-            api("POST", f"/repos/{REPO}/issues/{pr['number']}/comments", {"body": f"Superseded by `{branch}`."})
+            api("POST", f"/repos/{REPO}/issues/{pr['number']}/comments", {"body": f"Superseded by `{branch}`, which carries over the changes from this PR."})
             api("PATCH", f"/repos/{REPO}/pulls/{pr['number']}", {"state": "closed"})
             api("DELETE", f"/repos/{REPO}/git/refs/heads/{q(ref)}")
             log(f"{cp}: closed superseded PR #{pr['number']}")
@@ -335,9 +383,11 @@ def push_commits(branch, commits):
         run("git", "commit", "-q", "-m", message)
 
 
-def publish_result(result_dir):
+def publish_result(result_dir, item):
     res = json.loads((result_dir / "result.json").read_text())
     cp, old, new, status = res["atom"], res["old"], res["new"], res["status"]
+    # Changes carried over from an ai-assisted PR still need a careful review
+    ai = status == "ai" or (status != "failed" and item.get("base_ai", False))
     release = f"Upstream release: {res['url']}\n\n" if res["url"] else ""
     ai_summary = (result_dir / "ai-summary.md").read_text() if (result_dir / "ai-summary.md").exists() else ""
     pkgcheck = tail(result_dir / "pkgcheck.txt", 40)
@@ -357,7 +407,7 @@ def publish_result(result_dir):
 
     branch = branch_name(cp, new)
     message = f"chore({cp}): version {new}"
-    if status == "ai":
+    if ai:
         message += f"\n\n{CLAUDE_TRAILER}"
     commits = [(result_dir / "bump.patch", message)]
     drop = result_dir / "drop.patch"
@@ -373,6 +423,13 @@ def publish_result(result_dir):
         )
     else:
         intro = "Mechanical bump: the ebuild was copied unchanged and the Manifest regenerated.\n\n"
+    if item.get("base_pr"):
+        intro = (
+            f"Builds on #{item['base_pr']}, which this supersedes: its changes are carried over"
+            + (" and include work by Claude, so **review them carefully**" if item.get("base_ai") else "")
+            + ".\n\n"
+            + intro
+        )
     body = (
         f"Bumps `{cp}` from {old} to {new}.\n\n"
         + release
@@ -392,7 +449,7 @@ def publish_result(result_dir):
             "draft": status == "ai",
         },
     )
-    labels = ["autobump"] + (["ai-assisted"] if status == "ai" else [])
+    labels = ["autobump"] + (["ai-assisted"] if ai else [])
     api("POST", f"/repos/{REPO}/issues/{pr['number']}/labels", {"labels": labels})
     api("POST", f"/repos/{REPO}/issues/{pr['number']}/assignees", {"assignees": [MAINTAINER]})
     try:
@@ -404,6 +461,7 @@ def publish_result(result_dir):
         api("POST", f"/repos/{REPO}/issues/{issue['number']}/comments", {"body": f"Retried in #{pr['number']}."})
         api("PATCH", f"/repos/{REPO}/issues/{issue['number']}", {"state": "closed", "state_reason": "completed"})
         log(f"{cp}: closed issue #{issue['number']}")
+    close_older_issues(cp, new, pr["number"])
     close_superseded(cp, branch)
 
 
@@ -428,9 +486,11 @@ def cmd_publish(args):
     if len(results) < len(plan.get("bump", [])):
         log(f"expected {len(plan['bump'])} bump result(s), found {len(results)}")
         failures += len(plan["bump"]) - len(results)
+    items = {(i["atom"], i["new"]): i for i in plan.get("bump", [])}
     for result in results:
         try:
-            publish_result(result.parent)
+            res = json.loads(result.read_text())
+            publish_result(result.parent, items.get((res["atom"], res["new"]), {}))
         except Exception as e:
             log(f"{result.parent.name}: {e}")
             failures += 1

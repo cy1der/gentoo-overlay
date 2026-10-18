@@ -40,8 +40,16 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
 
    Every issue and PR is assigned to the repository owner, and PRs request
    their review (set the `AUTOBUMP_MAINTAINER` environment variable on the
-   publish step to use someone else). A newer version closes the older open
-   PR for the same package.
+   publish step to use someone else).
+
+   **When a newer version comes out first:** if the package still has an open
+   bump PR, the new bump is built on top of that PR's branch, so fixes made
+   there (by Claude, `@claude` or by hand) carry over. The intermediate
+   ebuild is left out, and the PR is marked `ai-assisted` if the carried
+   changes were. Once the new PR is open, the older PR is closed and its
+   branch deleted, and open issues for older versions of the package are
+   closed as superseded. If the newer version fails, the older PR stays open
+   so it can still be merged.
 
 Mention `@claude` in any issue or PR comment (owner only) to have Claude work
 on it interactively (`.github/workflows/claude.yml`). That runs without

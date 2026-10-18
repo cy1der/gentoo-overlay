@@ -135,9 +135,12 @@ job() {
 	fi
 	echo ">>> result: ${status}"
 
-	# Only changes inside the package directory are kept
+	# Only changes inside the package directory are kept. Diff against main,
+	# which publish applies the patch to, even when building on a PR branch.
+	local main
+	main=$(git rev-parse -q --verify origin/main || git rev-parse HEAD)
 	git add -A -- "${cp}"
-	git diff --cached --binary > "${OUT}/bump.patch"
+	git diff --cached --binary "${main}" -- "${cp}" > "${OUT}/bump.patch"
 	if [[ ${status} != failed && ${drop_old} == true ]]; then
 		git commit -q -m "tmp: bump"
 		if "${AUTOBUMP[@]}" drop "${cp}" "${old}" >> "${OUT}/build.log" 2>&1; then

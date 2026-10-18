@@ -85,8 +85,12 @@ jobs:
       matrix:
         item: ${{ fromJSON(needs.check.outputs.bump) }}
     steps:
+      # On top of the open PR for an older version, if there is one, so its
+      # fixes carry over. Full history so origin/main is there to diff against.
       - uses: actions/checkout@v7
         with:
+          ref: ${{ matrix.item.base }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Free disk space

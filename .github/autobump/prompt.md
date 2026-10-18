@@ -4,7 +4,7 @@ are running inside a throwaway `gentoo/stage3` container with the overlay at
 
 Upstream release: {{URL}}
 
-The workflow already copied the {{OLD}} ebuild to {{NEW}} and tried to
+The workflow already copied the newest ebuild to {{NEW}} and tried to
 regenerate the Manifest (and, unless noted below, to build it). Your job is to
 make `{{ATOM}}-{{NEW}}` pass `pkgcheck scan --exit error -- {{ATOM}}` and build
 with `emerge --oneshot ={{ATOM}}-{{NEW}}`.

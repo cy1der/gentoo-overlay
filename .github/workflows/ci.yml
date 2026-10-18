@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - "*/*/**"
+      - "!.github/**"
+
+permissions:
+  contents: read
+
+env:
+  STAGE3: gentoo/stage3:latest
+
+jobs:
+  test:
+    name: pkgcheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Find changed packages
+        id: changed
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          pkgs=$(git diff --name-only --no-renames "$BASE"...HEAD | grep -E '^[a-z0-9]+-[a-z0-9-]+/[^/]+/' | cut -d/ -f1,2 | sort -u \
+            | while read -r p; do [ -d "$p" ] && echo "$p"; done || true)
+          atoms=$(git diff --name-only --no-renames --diff-filter=AM "$BASE"...HEAD -- '*/*/*.ebuild' \
+            | sed -E 's|^([^/]+)/[^/]+/(.+)\.ebuild$|=\1/\2|' || true)
+          pkgs=$(tr '\n' ' ' <<< "$pkgs" | xargs)
+          atoms=$(tr '\n' ' ' <<< "$atoms" | xargs)
+          echo "pkgs=$pkgs" >> "$GITHUB_OUTPUT"
+          echo "atoms=$atoms" >> "$GITHUB_OUTPUT"
+          {
+            echo "Packages: ${pkgs:-none}"
+            echo
+            echo "Ebuilds to build: ${atoms:-none}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Free disk space
+        if: steps.changed.outputs.atoms != ''
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - uses: actions/cache@v6
+        if: steps.changed.outputs.pkgs != ''
+        with:
+          path: ~/gentoo-cache
+          key: gentoo-ci-${{ github.event.pull_request.number }}-${{ github.run_id }}
+          restore-keys: |
+            gentoo-ci-${{ github.event.pull_request.number }}-
+            gentoo-
+
+      - name: Set up Gentoo container
+        if: steps.changed.outputs.pkgs != ''
+        run: |
+          mkdir -p ~/gentoo-cache/distfiles ~/gentoo-cache/binpkgs
+          docker run -d --name gentoo -v "$PWD:/overlay" -w /overlay \
+            -v ~/gentoo-cache/distfiles:/var/cache/distfiles \
+            -v ~/gentoo-cache/binpkgs:/var/cache/binpkgs \
+            "$STAGE3" sleep infinity
+          docker exec gentoo /overlay/.github/autobump/gentoo.sh setup
+
+      - name: pkgcheck
+        if: steps.changed.outputs.pkgs != ''
+        env:
+          PKGS: ${{ steps.changed.outputs.pkgs }}
+        run: docker exec -e PKGS gentoo bash -c 'pkgcheck scan --exit error -- $PKGS'
+
+      - name: Build
+        # Add the skip-build label for packages too heavy for a hosted runner
+        if: steps.changed.outputs.atoms != '' && !contains(github.event.pull_request.labels.*.name, 'skip-build')
+        env:
+          ATOMS: ${{ steps.changed.outputs.atoms }}
+        run: |
+          for atom in $ATOMS; do
+            cp=$(docker exec gentoo python3 -c 'import sys; from portage.versions import cpv_getkey; print(cpv_getkey(sys.argv[1][1:]))' "$atom")
+            echo "::group::emerge $atom"
+            docker exec gentoo emerge --oneshot --usepkg-exclude "$cp" --buildpkg-exclude "$cp" "$atom"
+            echo "::endgroup::"
+          done
+
+      - name: Make the cache readable
+        if: always() && steps.changed.outputs.pkgs != ''
+        run: sudo chmod -R a+rX ~/gentoo-cache

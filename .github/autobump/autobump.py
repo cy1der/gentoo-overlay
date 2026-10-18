@@ -331,7 +331,13 @@ def cmd_publish(args):
         except Exception as e:  # keep going so one failure doesn't hide the rest
             log(f"{item['atom']}: {e}")
             failures += 1
-    for result in sorted(Path(args.results).glob("*/result.json")) if args.results else []:
+    # download-artifact nests each artifact in its own directory only when
+    # there is more than one, so look at any depth
+    results = sorted(Path(args.results).rglob("result.json")) if args.results else []
+    if len(results) < len(plan.get("bump", [])):
+        log(f"expected {len(plan['bump'])} bump result(s), found {len(results)}")
+        failures += len(plan["bump"]) - len(results)
+    for result in results:
         try:
             publish_result(result.parent)
         except Exception as e:

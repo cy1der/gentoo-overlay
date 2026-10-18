@@ -10,6 +10,7 @@ Subcommands:
 """
 
 import argparse
+import base64
 import functools
 import json
 import os
@@ -90,6 +91,19 @@ def api(method, path, data=None):
         if e.code == 404:
             return None
         raise RuntimeError(f"{method} {path}: {e.code} {e.read().decode()}") from e
+
+
+def graphql(query, variables):
+    req = urllib.request.Request(
+        "https://api.github.com/graphql",
+        data=json.dumps({"query": query, "variables": variables}).encode(),
+        headers={"Authorization": f"Bearer {os.environ['GH_TOKEN']}"},
+    )
+    with urllib.request.urlopen(req) as resp:
+        result = json.loads(resp.read())
+    if result.get("errors"):
+        raise RuntimeError(f"GraphQL: {result['errors']}")
+    return result["data"]
 
 
 def q(s):
@@ -250,6 +264,55 @@ def close_superseded(cp, branch):
             log(f"{cp}: closed superseded PR #{pr['number']}")
 
 
+CREATE_COMMIT = """
+mutation($input: CreateCommitOnBranchInput!) {
+  createCommitOnBranch(input: $input) { commit { oid } }
+}
+"""
+
+
+def push_commits(branch, commits):
+    """Create branch from origin/main with one commit per (patch, message).
+
+    The commits are made through the API rather than pushed, so GitHub signs
+    them as the App and they show as Verified. The patches are also applied
+    to a local checkout to work out which files each commit changes.
+    """
+    head = run("git", "rev-parse", "origin/main", capture=True).strip()
+    ref = f"/repos/{REPO}/git/refs/heads/{q(branch)}"
+    if api("GET", ref):
+        api("PATCH", ref, {"sha": head, "force": True})
+    else:
+        api("POST", f"/repos/{REPO}/git/refs", {"ref": f"refs/heads/{branch}", "sha": head})
+    run("git", "checkout", "-q", "-B", branch, "origin/main")
+
+    for patch, message in commits:
+        run("git", "apply", "--index", str(patch))
+        additions, deletions = [], []
+        changed = run("git", "diff", "--cached", "--name-status", "--no-renames", capture=True)
+        for line in changed.splitlines():
+            state, path = line.split("\t", 1)
+            if state == "D":
+                deletions.append({"path": path})
+            else:
+                contents = base64.b64encode((ROOT / path).read_bytes()).decode()
+                additions.append({"path": path, "contents": contents})
+        headline, _, body = message.partition("\n\n")
+        data = graphql(
+            CREATE_COMMIT,
+            {
+                "input": {
+                    "branch": {"repositoryNameWithOwner": REPO, "branchName": branch},
+                    "expectedHeadOid": head,
+                    "message": {"headline": headline, "body": body},
+                    "fileChanges": {"additions": additions, "deletions": deletions},
+                }
+            },
+        )
+        head = data["createCommitOnBranch"]["commit"]["oid"]
+        run("git", "commit", "-q", "-m", message)
+
+
 def publish_result(result_dir):
     res = json.loads((result_dir / "result.json").read_text())
     cp, old, new, status = res["atom"], res["old"], res["new"], res["status"]
@@ -271,17 +334,14 @@ def publish_result(result_dir):
         return
 
     branch = branch_name(cp, new)
-    run("git", "checkout", "-q", "-B", branch, "origin/main")
     message = f"chore({cp}): latest version"
     if status == "ai":
         message += f"\n\n{CLAUDE_TRAILER}"
-    run("git", "apply", "--index", str(result_dir / "bump.patch"))
-    run("git", "commit", "-q", "-m", message)
+    commits = [(result_dir / "bump.patch", message)]
     drop = result_dir / "drop.patch"
     if drop.exists() and drop.stat().st_size:
-        run("git", "apply", "--index", str(drop))
-        run("git", "commit", "-q", "-m", f"chore({cp}): drop {old}")
-    run("git", "push", "-q", "--force", "origin", branch)
+        commits.append((drop, f"chore({cp}): drop {old}"))
+    push_commits(branch, commits)
 
     if status == "ai":
         intro = (

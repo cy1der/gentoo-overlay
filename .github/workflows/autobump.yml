@@ -142,8 +142,8 @@ jobs:
 
       - uses: actions/checkout@v7
         with:
-          token: ${{ steps.app.outputs.token }}
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/download-artifact@v8
         if: needs.check.outputs.bump != '[]'
@@ -154,11 +154,11 @@ jobs:
       - name: Open PRs and issues
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
-          APP_SLUG: ${{ steps.app.outputs.app-slug }}
           PLAN: ${{ needs.check.outputs.plan }}
         run: |
-          user_id=$(gh api "/users/${APP_SLUG}%5Bbot%5D" --jq .id)
-          git config user.name "${APP_SLUG}[bot]"
-          git config user.email "${user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
+          # Commits are created through the API (and signed by GitHub); the
+          # local ones only track which files each patch changes
+          git config user.name autobump
+          git config user.email autobump@localhost
           printf '%s' "$PLAN" > "$RUNNER_TEMP/plan.json"
           python3 .github/autobump/autobump.py publish --plan "$RUNNER_TEMP/plan.json" --results results

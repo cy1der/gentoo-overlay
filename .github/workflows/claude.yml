@@ -47,4 +47,5 @@ jobs:
           github_token: ${{ steps.app.outputs.token }}
           bot_id: ${{ steps.bot.outputs.id }}
           bot_name: ${{ steps.app.outputs.app-slug }}[bot]
+          use_commit_signing: true
           branch_prefix: claude/

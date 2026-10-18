@@ -28,7 +28,8 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
      new ebuild (deps, patches, `CRATES`, ...). The workflow re-runs pkgcheck
      and emerge after each round; Claude saying it's done isn't enough.
    - Only changes inside the package directory are kept.
-3. **publish** commits as the GitHub App bot, following `CONTRIBUTING.md`
+3. **publish** creates the commits through GitHub's API as the App bot, so
+   GitHub signs them (Verified). They follow `CONTRIBUTING.md`
    (`chore(<cat>/<pn>): latest version`, then `chore(<cat>/<pn>): drop <old>`
    if `x_drop_old`), and opens:
    - a **PR** for a mechanical bump,
@@ -95,6 +96,9 @@ Gentoo versions become issues.
 - The bump job (which builds upstream code and runs Claude) has a read-only
   `GITHUB_TOKEN` and no push credentials. Only the publish job gets the App
   token, and it only applies patches and calls the API.
+- `main` should have a ruleset that only lets the repository admin update it,
+  so neither the bot nor `@claude` can push there directly; they can only
+  open PRs.
 - Claude runs with a fixed tool allowlist and only receives the OAuth token in
   its own process. Builds that Claude starts itself inherit Claude's
   environment. Setting `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` on the `claude`

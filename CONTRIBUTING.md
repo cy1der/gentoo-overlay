@@ -65,3 +65,22 @@ with the package atom as the scope:
 - Prebuilt upstream binaries use the `-bin` suffix (e.g. `igir-bin`)
 - Set `KEYWORDS="-* ~amd64 ..."` to list only the arches upstream ships,
   set `RESTRICT="strip"`, and list the installed binaries in `QA_PREBUILT`
+
+## Automated bumps
+
+A daily workflow checks upstream for new versions and opens PRs (see
+[`.github/autobump/README.md`](.github/autobump/README.md)). To opt a package
+in, add an entry for it to
+[`.github/autobump/nvchecker.toml`](.github/autobump/nvchecker.toml) and pick
+an `x_mode`:
+
+| `x_mode` | What happens on a new upstream version                                   |
+| -------- | ------------------------------------------------------------------------ |
+| `pr`     | Copy the ebuild, regenerate the Manifest, build it, open a PR. If that fails, Claude tries to fix it |
+| `ai`     | Claude does the bump (patches, vendored crates, dependency changes) and opens a draft PR |
+| `issue`  | Only open an issue (for packages too heavy to build on a hosted runner)  |
+
+Bot and Claude commits follow the same rules as everything else in this file.
+PRs labelled `ai-assisted` contain changes written by Claude; review them like
+any other contribution before marking them ready. Comment `@claude` on an
+issue or PR to have Claude work on it.

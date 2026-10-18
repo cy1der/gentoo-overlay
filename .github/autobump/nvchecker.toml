@@ -1,0 +1,178 @@
+# Upstream version sources for automated bumps, see .github/autobump/README.md.
+#
+# Each table is an nvchecker entry (https://nvchecker.readthedocs.io) keyed by
+# the package atom, plus our own keys, which nvchecker ignores:
+#   x_mode     "pr" (mechanical bump, falls back to Claude), "ai" (Claude
+#              does the bump), or "issue" (only open an issue). Default: "issue"
+#   x_drop_old drop the previous ebuild in a second commit. Default: false
+
+# --- pr: mechanical bumps ---------------------------------------------------
+
+["games-util/igir-bin"]
+source = "github"
+github = "emmercm/igir"
+use_latest_release = true
+prefix = "v"
+x_mode = "pr"
+x_drop_old = true
+
+["net-p2p/mkbrr-bin"]
+source = "github"
+github = "autobrr/mkbrr"
+use_latest_release = true
+prefix = "v"
+x_mode = "pr"
+x_drop_old = true
+
+["net-p2p/mkbrr-gui-bin"]
+source = "github"
+github = "autobrr/mkbrr"
+use_latest_release = true
+prefix = "v"
+x_mode = "pr"
+x_drop_old = true
+
+["dev-python/proton-core"]
+source = "github"
+github = "ProtonVPN/python-proton-core"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "pr"
+
+["dev-python/proton-keyring-linux"]
+source = "github"
+github = "ProtonVPN/python-proton-keyring-linux"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "pr"
+
+["net-vpn/proton-vpn-gtk-app"]
+source = "github"
+github = "ProtonVPN/proton-vpn-gtk-app"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "pr"
+
+["gui-apps/monique"]
+source = "github"
+github = "ToRvaLDz/monique"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "pr"
+
+["media-sound/picard"]
+source = "github"
+github = "metabrainz/picard"
+use_max_tag = true
+include_regex = '^release-\d+(\.\d+)*$'
+prefix = "release-"
+x_mode = "pr"
+
+["media-libs/draco"]
+source = "github"
+github = "google/draco"
+use_max_tag = true
+include_regex = '^\d+(\.\d+)*$'
+x_mode = "pr"
+
+["media-libs/libnoise"]
+source = "github"
+github = "SoftFever/Orca-deps-libnoise"
+use_max_tag = true
+include_regex = '^\d+(\.\d+)*$'
+x_mode = "pr"
+
+# --- ai: patches, vendored crates or bundled deps ----------------------------
+
+["dev-python/proton-vpn-api-core"]
+source = "github"
+github = "ProtonVPN/python-proton-vpn-api-core"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "ai"
+
+["net-vpn/proton-vpn-daemon"]
+source = "github"
+github = "ProtonVPN/proton-vpn-daemon"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "ai"
+
+["media-libs/rkcommon"]
+source = "github"
+github = "RenderKit/rkcommon"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "ai"
+
+["media-libs/openvkl"]
+source = "github"
+github = "RenderKit/openvkl"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "ai"
+
+["media-libs/ospray"]
+source = "github"
+github = "RenderKit/ospray"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "ai"
+
+["media-libs/web-ifc"]
+source = "github"
+github = "ThatOpen/engine_web-ifc"
+use_max_tag = true
+include_regex = '^\d+(\.\d+)*$'
+x_mode = "ai"
+
+["media-libs/materialx"]
+source = "github"
+github = "AcademySoftwareFoundation/MaterialX"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "ai"
+
+# --- issue: too heavy to build on a hosted runner ----------------------------
+
+["sci-libs/vtk"]
+source = "github"
+github = "Kitware/VTK"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "issue"
+
+["media-libs/openusd"]
+source = "github"
+github = "PixarAnimationStudios/OpenUSD"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "issue"
+
+["media-gfx/f3d"]
+source = "github"
+github = "f3d-app/f3d"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "issue"
+
+["media-gfx/orcaslicer"]
+source = "github"
+github = "OrcaSlicer/OrcaSlicer"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "issue"

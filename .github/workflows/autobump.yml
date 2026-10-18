@@ -1,0 +1,164 @@
+name: Autobump
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      only:
+        description: Only check this package (e.g. net-p2p/mkbrr-bin)
+        default: ""
+      force_mode:
+        description: Override x_mode
+        type: choice
+        options: [config, pr, ai, issue]
+        default: config
+      dry_run:
+        description: Only report what would be bumped
+        type: boolean
+        default: false
+
+concurrency:
+  group: autobump
+
+permissions:
+  contents: read
+
+env:
+  STAGE3: gentoo/stage3:latest
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+      bump: ${{ steps.plan.outputs.bump }}
+      has_work: ${{ steps.plan.outputs.has_work }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Find new upstream versions
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ONLY: ${{ inputs.only }}
+          FORCE_MODE: ${{ inputs.force_mode != 'config' && inputs.force_mode || '' }}
+        run: |
+          docker run --rm -e GITHUB_TOKEN -e GITHUB_REPOSITORY -e ONLY -e FORCE_MODE \
+            -v "$PWD:/overlay" -w /overlay "$STAGE3" bash -c '
+              python3 -m venv --system-site-packages /tmp/venv &&
+              /tmp/venv/bin/pip install -q nvchecker &&
+              /tmp/venv/bin/python .github/autobump/autobump.py check \
+                --only "$ONLY" --force-mode "$FORCE_MODE" --output plan.json > /dev/null'
+
+      - id: plan
+        run: |
+          {
+            echo "plan=$(jq -c . plan.json)"
+            echo "bump=$(jq -c .bump plan.json)"
+            echo "has_work=$(jq '(.bump + .issue) | length > 0' plan.json)"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### New upstream versions"
+            jq -r '(.bump + .issue)[] | "- `\(.atom)` \(.old) → \(.new) (\(.mode))"' plan.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  bump:
+    needs: check
+    if: needs.check.outputs.bump != '[]' && !inputs.dry_run
+    name: bump ${{ matrix.item.atom }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        item: ${{ fromJSON(needs.check.outputs.bump) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/gentoo-cache
+          key: gentoo-${{ matrix.item.slug }}-${{ github.run_id }}
+          restore-keys: |
+            gentoo-${{ matrix.item.slug }}-
+            gentoo-
+
+      - name: Set up Gentoo container
+        run: |
+          mkdir -p ~/gentoo-cache/distfiles ~/gentoo-cache/binpkgs
+          docker run -d --name gentoo -v "$PWD:/overlay" -w /overlay \
+            -v ~/gentoo-cache/distfiles:/var/cache/distfiles \
+            -v ~/gentoo-cache/binpkgs:/var/cache/binpkgs \
+            "$STAGE3" sleep infinity
+          docker exec gentoo /overlay/.github/autobump/gentoo.sh setup
+
+      - name: Bump ${{ matrix.item.atom }} to ${{ matrix.item.new }}
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ATOM: ${{ matrix.item.atom }}
+          OLD: ${{ matrix.item.old }}
+          NEW: ${{ matrix.item.new }}
+          MODE: ${{ matrix.item.mode }}
+          DROP_OLD: ${{ matrix.item.drop_old }}
+          URL: ${{ matrix.item.url }}
+        run: |
+          docker exec -e CLAUDE_CODE_OAUTH_TOKEN gentoo /overlay/.github/autobump/gentoo.sh \
+            job "$ATOM" "$OLD" "$NEW" "$MODE" "$DROP_OLD" "$URL"
+
+      - name: Make the cache readable
+        if: always()
+        run: sudo chmod -R a+rX ~/gentoo-cache
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: result-${{ matrix.item.key }}
+          path: .autobump-out/
+          include-hidden-files: true
+          retention-days: 14
+
+  publish:
+    needs: [check, bump]
+    if: always() && needs.check.result == 'success' && needs.check.outputs.has_work == 'true' && !inputs.dry_run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app
+        with:
+          client-id: ${{ vars.AUTOBUMP_CLIENT_ID }}
+          private-key: ${{ secrets.AUTOBUMP_APP_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app.outputs.token }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        if: needs.check.outputs.bump != '[]'
+        with:
+          pattern: result-*
+          path: results
+
+      - name: Open PRs and issues
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+          PLAN: ${{ needs.check.outputs.plan }}
+        run: |
+          user_id=$(gh api "/users/${APP_SLUG}%5Bbot%5D" --jq .id)
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
+          printf '%s' "$PLAN" > "$RUNNER_TEMP/plan.json"
+          python3 .github/autobump/autobump.py publish --plan "$RUNNER_TEMP/plan.json" --results results

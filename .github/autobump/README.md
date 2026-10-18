@@ -72,6 +72,9 @@ Gentoo versions become issues.
 - **By hand:** Actions → Autobump → Run workflow. `only` limits it to one
   package, `force_mode` overrides `x_mode`, `dry_run` only lists what would
   be bumped.
+- **Retrying** a `needs-human` issue (e.g. after fixing the workflow): run it
+  with `only` set to the package and `retry` ticked. A PR closes the issue;
+  another failure is added to it as a comment.
 - **Locally**, to see what's outdated: `pip install nvchecker`, then
   `GITHUB_TOKEN=$(gh auth token) python3 .github/autobump/autobump.py check`.
 

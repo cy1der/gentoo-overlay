@@ -17,6 +17,10 @@ on:
         description: Only report what would be bumped
         type: boolean
         default: false
+      retry:
+        description: Retry versions that only have a needs-human issue (use with "only")
+        type: boolean
+        default: false
 
 concurrency:
   group: autobump
@@ -48,13 +52,14 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           ONLY: ${{ inputs.only }}
           FORCE_MODE: ${{ inputs.force_mode != 'config' && inputs.force_mode || '' }}
+          RETRY: ${{ inputs.retry && '--retry' || '' }}
         run: |
-          docker run --rm -e GITHUB_TOKEN -e GITHUB_REPOSITORY -e ONLY -e FORCE_MODE \
+          docker run --rm -e GITHUB_TOKEN -e GITHUB_REPOSITORY -e ONLY -e FORCE_MODE -e RETRY \
             -v "$PWD:/overlay" -w /overlay "$STAGE3" bash -c '
               python3 -m venv --system-site-packages /tmp/venv &&
               /tmp/venv/bin/pip install -q nvchecker &&
               /tmp/venv/bin/python .github/autobump/autobump.py check \
-                --only "$ONLY" --force-mode "$FORCE_MODE" --output plan.json > /dev/null'
+                --only "$ONLY" --force-mode "$FORCE_MODE" $RETRY --output plan.json > /dev/null'
 
       - id: plan
         run: |

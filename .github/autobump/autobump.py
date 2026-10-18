@@ -118,7 +118,16 @@ def issue_title(cp, ver):
     return f"{cp}: {ver} available"
 
 
-def already_handled(cp, ver):
+def find_issues(cp, ver, state=""):
+    """Issues titled for cp-ver, optionally only "open" or "closed" ones."""
+    query = f'repo:{REPO} is:issue in:title "{issue_title(cp, ver)}"'
+    if state:
+        query += f" is:{state}"
+    found = api("GET", f"/search/issues?q={q(query)}")
+    return [i for i in found["items"] if i["title"] == issue_title(cp, ver)]
+
+
+def already_handled(cp, ver, check_issues=True):
     """True if a branch, PR (in any state) or issue already exists for cp-ver."""
     branch = branch_name(cp, ver)
     owner = REPO.split("/")[0]
@@ -126,9 +135,7 @@ def already_handled(cp, ver):
         return True
     if api("GET", f"/repos/{REPO}/pulls?state=all&head={q(owner + ':' + branch)}"):
         return True
-    query = f'repo:{REPO} is:issue in:title "{issue_title(cp, ver)}"'
-    found = api("GET", f"/search/issues?q={q(query)}")
-    return any(i["title"] == issue_title(cp, ver) for i in found["items"])
+    return check_issues and bool(find_issues(cp, ver))
 
 
 # --- check -------------------------------------------------------------------
@@ -171,7 +178,7 @@ def cmd_check(args):
             mode = args.force_mode or entry.get("x_mode", "issue")
         if mode not in MODES:
             sys.exit(f"{cp}: unknown x_mode {mode!r}")
-        if already_handled(cp, new):
+        if already_handled(cp, new, check_issues=not args.retry):
             log(f"{cp}: {new} already has a branch, PR or issue, skipping")
             continue
         item = {
@@ -246,6 +253,14 @@ def details(summary, body, lang=""):
 
 
 def open_issue(item, body, labels):
+    existing = find_issues(item["atom"], item["new"], "open")
+    if existing:
+        # A retry that failed again: add to the existing issue
+        number = existing[0]["number"]
+        api("POST", f"/repos/{REPO}/issues/{number}/comments", {"body": f"Retried, still failing.\n\n{body}"})
+        api("POST", f"/repos/{REPO}/issues/{number}/labels", {"labels": labels})
+        log(f"{item['atom']}: commented on issue #{number}")
+        return
     issue = api(
         "POST",
         f"/repos/{REPO}/issues",
@@ -373,6 +388,10 @@ def publish_result(result_dir):
     labels = ["autobump"] + (["ai-assisted"] if status == "ai" else [])
     api("POST", f"/repos/{REPO}/issues/{pr['number']}/labels", {"labels": labels})
     log(f"{cp}: opened PR {pr['html_url']}")
+    for issue in find_issues(cp, new, "open"):
+        api("POST", f"/repos/{REPO}/issues/{issue['number']}/comments", {"body": f"Retried in #{pr['number']}."})
+        api("PATCH", f"/repos/{REPO}/issues/{issue['number']}", {"state": "closed", "state_reason": "completed"})
+        log(f"{cp}: closed issue #{issue['number']}")
     close_superseded(cp, branch)
 
 
@@ -418,6 +437,7 @@ def main():
     p.add_argument("--only", help="only check this atom")
     p.add_argument("--force-mode", choices=MODES + ("",), help="override x_mode")
     p.add_argument("--output", help="also write the plan to this file")
+    p.add_argument("--retry", action="store_true", help="retry versions that only have an issue")
     p.set_defaults(func=cmd_check)
 
     p = sub.add_parser("bump")

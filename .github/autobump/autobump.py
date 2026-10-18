@@ -349,7 +349,7 @@ def publish_result(result_dir):
         return
 
     branch = branch_name(cp, new)
-    message = f"chore({cp}): latest version"
+    message = f"chore({cp}): version {new}"
     if status == "ai":
         message += f"\n\n{CLAUDE_TRAILER}"
     commits = [(result_dir / "bump.patch", message)]
@@ -378,7 +378,7 @@ def publish_result(result_dir):
         "POST",
         f"/repos/{REPO}/pulls",
         {
-            "title": f"chore({cp}): latest version ({new})",
+            "title": f"chore({cp}): version {new}",
             "head": branch,
             "base": "main",
             "body": body,

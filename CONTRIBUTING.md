@@ -28,7 +28,7 @@ with the package atom as the scope:
 | Scenario                         | Example                                                          |
 | -------------------------------- | ---------------------------------------------------------------- |
 | New package                      | `feat(net-p2p/mkbrr-bin): new ebuild`                            |
-| Version bump                     | `chore(gui-apps/monique): latest version`                        |
+| Version bump                     | `chore(gui-apps/monique): version 0.8.3`                         |
 | Pull changes from `::gentoo`     | `chore(sci-libs/vtk): python 3.14 and new patch from ::gentoo`   |
 | Drop an old version              | `chore(gui-apps/monique): drop 0.6.7`                            |
 | Remove a package                 | `chore(media-libs/libnoise): remove package`                     |

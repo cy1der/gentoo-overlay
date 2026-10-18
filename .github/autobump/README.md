@@ -30,7 +30,7 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
    - Only changes inside the package directory are kept.
 3. **publish** creates the commits through GitHub's API as the App bot, so
    GitHub signs them (Verified). They follow `CONTRIBUTING.md`
-   (`chore(<cat>/<pn>): latest version`, then `chore(<cat>/<pn>): drop <old>`
+   (`chore(<cat>/<pn>): version <new>`, then `chore(<cat>/<pn>): drop <old>`
    if `x_drop_old`), and opens:
    - a **PR** for a mechanical bump,
    - a **draft PR** labelled `ai-assisted` if Claude changed anything (the

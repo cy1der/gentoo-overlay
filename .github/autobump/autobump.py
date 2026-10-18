@@ -27,6 +27,8 @@ ROOT = Path(__file__).resolve().parents[2]
 HERE = ROOT / ".github" / "autobump"
 CONFIG = HERE / "nvchecker.toml"
 REPO = os.environ.get("GITHUB_REPOSITORY", "cy1der/gentoo-overlay")
+# Assigned to every issue and PR, and asked to review the PRs
+MAINTAINER = os.environ.get("AUTOBUMP_MAINTAINER") or REPO.split("/")[0]
 MODES = ("pr", "ai", "issue")
 CLAUDE_TRAILER = "Co-Authored-By: Claude <noreply@anthropic.com>"
 
@@ -264,7 +266,12 @@ def open_issue(item, body, labels):
     issue = api(
         "POST",
         f"/repos/{REPO}/issues",
-        {"title": issue_title(item["atom"], item["new"]), "body": body, "labels": labels},
+        {
+            "title": issue_title(item["atom"], item["new"]),
+            "body": body,
+            "labels": labels,
+            "assignees": [MAINTAINER],
+        },
     )
     log(f"{item['atom']}: opened issue {issue['html_url']}")
 
@@ -387,6 +394,11 @@ def publish_result(result_dir):
     )
     labels = ["autobump"] + (["ai-assisted"] if status == "ai" else [])
     api("POST", f"/repos/{REPO}/issues/{pr['number']}/labels", {"labels": labels})
+    api("POST", f"/repos/{REPO}/issues/{pr['number']}/assignees", {"assignees": [MAINTAINER]})
+    try:
+        api("POST", f"/repos/{REPO}/pulls/{pr['number']}/requested_reviewers", {"reviewers": [MAINTAINER]})
+    except RuntimeError as e:  # the PR is still useful without the request
+        log(f"{cp}: could not request a review: {e}")
     log(f"{cp}: opened PR {pr['html_url']}")
     for issue in find_issues(cp, new, "open"):
         api("POST", f"/repos/{REPO}/issues/{issue['number']}/comments", {"body": f"Retried in #{pr['number']}."})

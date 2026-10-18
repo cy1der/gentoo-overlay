@@ -38,7 +38,10 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
    - an **issue** labelled `needs-human` if nothing worked, with the logs,
    - an **issue** for `x_mode = "issue"` packages.
 
-   A newer version closes the older open PR for the same package.
+   Every issue and PR is assigned to the repository owner, and PRs request
+   their review (set the `AUTOBUMP_MAINTAINER` environment variable on the
+   publish step to use someone else). A newer version closes the older open
+   PR for the same package.
 
 Mention `@claude` in any issue or PR comment (owner only) to have Claude work
 on it interactively (`.github/workflows/claude.yml`). That runs without

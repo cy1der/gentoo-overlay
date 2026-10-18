@@ -17,6 +17,10 @@ export PATH="${HOME}/.local/bin:${PATH}"
 CLAUDE_TOOLS="Read,Edit,Write,Glob,Grep,WebFetch,Bash(ebuild:*),Bash(emerge:*),Bash(pkgdev:*),Bash(pkgcheck:*),Bash(pycargoebuild:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(diff:*),Bash(tar:*),Bash(ls:*),Bash(find:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*)"
 
 setup() {
+	# A restored actions/cache belongs to the runner user, but portage and
+	# pkgdev fetch as the portage user
+	chown -R portage:portage /var/cache/distfiles
+	chmod 2775 /var/cache/distfiles
 	emerge-webrsync --quiet
 	cat >> /etc/portage/make.conf <<-EOF
 		FEATURES="\${FEATURES} getbinpkg buildpkg -ipc-sandbox -network-sandbox -pid-sandbox"

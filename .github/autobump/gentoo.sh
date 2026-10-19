@@ -21,7 +21,9 @@ setup() {
 	# pkgdev fetch as the portage user
 	chown -R portage:portage /var/cache/distfiles
 	chmod 2775 /var/cache/distfiles
-	emerge-webrsync --quiet
+	# The workflows mount ::gentoo from the gentoo/portage image, which avoids
+	# emerge-webrsync's dependency on a reachable OpenPGP keyserver
+	[[ -d /var/db/repos/gentoo/metadata ]] || emerge-webrsync --quiet
 	cat >> /etc/portage/make.conf <<-EOF
 		FEATURES="\${FEATURES} getbinpkg buildpkg -ipc-sandbox -network-sandbox -pid-sandbox"
 		ACCEPT_LICENSE="*"

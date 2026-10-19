@@ -59,7 +59,9 @@ jobs:
         if: steps.changed.outputs.pkgs != ''
         run: |
           mkdir -p ~/gentoo-cache/distfiles ~/gentoo-cache/binpkgs
-          docker run -d --name gentoo -v "$PWD:/overlay" -w /overlay \
+          # ::gentoo from the daily gentoo/portage image (no keyserver needed)
+          docker create -v /var/db/repos/gentoo --name portage-tree gentoo/portage:latest /bin/true
+          docker run -d --name gentoo --volumes-from portage-tree -v "$PWD:/overlay" -w /overlay \
             -v ~/gentoo-cache/distfiles:/var/cache/distfiles \
             -v ~/gentoo-cache/binpkgs:/var/cache/binpkgs \
             "$STAGE3" sleep infinity

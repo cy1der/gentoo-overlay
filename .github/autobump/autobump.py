@@ -17,6 +17,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 import urllib.error
 import urllib.parse
@@ -148,8 +149,16 @@ def nvchecker_results(only):
     cmd = [exe, "-c", str(CONFIG), "--logger", "json"]
     if only:
         cmd += ["-e", only]
-    proc = subprocess.run(cmd, cwd=HERE, text=True, capture_output=True)
-    results = {}
+    with tempfile.NamedTemporaryFile("w", suffix=".toml") as keyfile:
+        # nvchecker only reads tokens from a keyfile, not from $GITHUB_TOKEN.
+        # Without one, GitHub allows 60 requests an hour per (shared) IP.
+        token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+        if token:
+            keyfile.write(f'[keys]\ngithub = "{token}"\n')
+            keyfile.flush()
+            cmd += ["-k", keyfile.name]
+        proc = subprocess.run(cmd, cwd=HERE, text=True, capture_output=True)
+    results, failed = {}, []
     for line in proc.stdout.splitlines() + proc.stderr.splitlines():
         try:
             event = json.loads(line)
@@ -158,7 +167,11 @@ def nvchecker_results(only):
         if "version" in event and event.get("name"):
             results[event["name"]] = event
         elif event.get("level") in ("error", "warning"):
-            log(f"nvchecker: {event.get('name', '?')}: {event.get('event')} {event.get('error', '')}")
+            failed.append(event.get("name", "?"))
+            # Shows up as an annotation on the workflow run
+            print(f"::warning::nvchecker: {event.get('name', '?')}: {event.get('event')} {event.get('error', '')}", file=sys.stderr)
+    if failed and not results:
+        sys.exit("nvchecker could not check any package")
     return results
 
 

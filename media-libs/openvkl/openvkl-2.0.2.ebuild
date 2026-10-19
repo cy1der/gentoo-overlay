@@ -5,7 +5,7 @@ EAPI=8
 
 inherit cmake flag-o-matic
 
-DESCRIPTION="Intel® Open Volume Kernel Library is a collection of high performance volume computation kernels."
+DESCRIPTION="Intel Open Volume Kernel Library: high-performance volume computation kernels"
 HOMEPAGE="https://openvkl.org/"
 SRC_URI="https://github.com/RenderKit/openvkl/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz"
 
@@ -14,9 +14,9 @@ SLOT="0"
 KEYWORDS="~amd64"
 
 RDEPEND="
-    >=dev-lang/ispc-1.18.0
-    media-libs/embree
-    media-libs/rkcommon
+	>=dev-lang/ispc-1.18.0
+	media-libs/embree
+	media-libs/rkcommon
 "
 
 DEPEND="${RDEPEND}"

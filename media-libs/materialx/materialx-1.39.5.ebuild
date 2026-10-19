@@ -41,7 +41,12 @@ KEYWORDS="~amd64"
 IUSE="doc viewer graph-editor opencolorio openimageio python"
 REQUIRED_USE="python? ( ${PYTHON_REQUIRED_USE} )"
 
+# The GLSL render module is always built; the viewer and graph editor
+# bundle GLFW, which needs the X11 extension libraries
 RDEPEND="
+	virtual/opengl
+	x11-libs/libX11
+	x11-libs/libXt
 	python? (
 		${PYTHON_DEPS}
 		$(python_gen_cond_dep '
@@ -50,11 +55,24 @@ RDEPEND="
 	)
 	openimageio? ( >=media-libs/openimageio-2.2 )
 	opencolorio? ( >=media-libs/opencolorio-2.4 )
-	viewer? ( virtual/opengl )
-	graph-editor? ( virtual/opengl )
+	graph-editor? (
+		x11-libs/libXcursor
+		x11-libs/libXi
+		x11-libs/libXinerama
+		x11-libs/libXrandr
+	)
+	viewer? (
+		x11-libs/libXcursor
+		x11-libs/libXext
+		x11-libs/libXi
+		x11-libs/libXinerama
+		x11-libs/libXrandr
+	)
 "
-
-DEPEND="${RDEPEND}"
+DEPEND="
+	${RDEPEND}
+	x11-base/xorg-proto
+"
 
 BDEPEND="
 	doc? ( app-text/doxygen )

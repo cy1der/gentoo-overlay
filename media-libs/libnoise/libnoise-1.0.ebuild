@@ -5,7 +5,7 @@ EAPI=8
 
 inherit cmake
 
-DESCRIPTION="A general-purpose library that generates three-dimensional coherent noise modified for OrcaSlicer."
+DESCRIPTION="Library for generating coherent 3D noise (OrcaSlicer fork)"
 HOMEPAGE="https://github.com/SoftFever/Orca-deps-libnoise"
 SRC_URI="https://github.com/SoftFever/Orca-deps-libnoise/archive/refs/tags/${PV}.tar.gz -> ${P}.tar.gz"
 S="${WORKDIR}/Orca-deps-${PN}-${PV}"

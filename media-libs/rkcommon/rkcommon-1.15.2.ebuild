@@ -14,7 +14,7 @@ SLOT="0"
 KEYWORDS="~amd64"
 
 PATCHES=(
-	"${FILESDIR}/${P}-fix-type-punning.patch"
+	"${FILESDIR}"/${PN}-1.15.2-fix-type-punning.patch
 )
 
 RDEPEND=">=dev-cpp/tbb-4.4.3"

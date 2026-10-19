@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
 <pkgmetadata>
+  <upstream>
+    <remote-id type="github">f3d-app/f3d</remote-id>
+  </upstream>
   <longdescription>
     F3D (pronounced `/fɛd/`) is a fast and minimalist 3D viewer desktop application.
     It supports many file formats, from digital content to scientific datasets (including

@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
 <pkgmetadata>
+  <upstream>
+    <remote-id type="github">PixarAnimationStudios/OpenUSD</remote-id>
+  </upstream>
   <use>
     <flag name="alembic">Enable the Alembic plugin</flag>
     <flag name="draco">Enable the Draco plugin</flag>

@@ -436,7 +436,7 @@ IUSE="test"
 RESTRICT="bindist mirror !test? ( test )"
 
 PATCHES=(
-	"${FILESDIR}/${P}-remove-calls-to-apt.patch"
+	"${FILESDIR}"/${PN}-5.8.7-remove-calls-to-apt.patch
 )
 
 DEPEND="

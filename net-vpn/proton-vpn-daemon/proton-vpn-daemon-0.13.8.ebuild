@@ -19,8 +19,8 @@ KEYWORDS="~amd64"
 RESTRICT="test"
 
 PATCHES=(
-	"${FILESDIR}/${P}-cgroup-without-systemd.patch"
-	"${FILESDIR}/${P}-dbus-fixes.patch"
+	"${FILESDIR}"/${PN}-0.13.8-cgroup-without-systemd.patch
+	"${FILESDIR}"/${PN}-0.13.8-dbus-fixes.patch
 )
 
 # systemd-python is listed upstream but never imported

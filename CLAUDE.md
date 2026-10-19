@@ -7,7 +7,9 @@ When bumping a package:
 - Keep keywords as testing (`~arch`); `-bin` packages keep `-*` and only list
   the arches upstream ships.
 - Regenerate the Manifest with `pkgdev manifest` and check with
-  `pkgcheck scan --exit error -- <cat>/<pn>`.
+  `pkgcheck scan --exit error,warning,style -- <cat>/<pn>`; it must pass.
+- Keep using existing patches under their current names; patch paths use a
+  literal version, not `${P}`.
 - Touch one package per commit.
 
 Version detection and automated bumps are configured in

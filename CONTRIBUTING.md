@@ -49,13 +49,24 @@ with the package atom as the scope:
 - Manifests are thin (`DIST` entries only). Regenerate them with
   `pkgdev manifest` or `ebuild <file> manifest`
 - Add a `metadata.xml` with at least an `<upstream>` `remote-id` where one
-  exists
-- Run `pkgcheck scan` on the package before committing
+  exists, and descriptions for any USE flags not described in `::gentoo`
+- Fetch release tarballs rather than git checkouts (`git-r3`) for versioned
+  ebuilds
+- Keep only the newest version of a package unless an older one is still
+  needed; drop the previous version when bumping
+- `pkgcheck scan --exit error,warning,style -- <cat>/<pn>` must pass before
+  committing (CI enforces this on PRs). `info` findings such as
+  `PythonCompatUpdate` don't block, but fix them when it's easy
 
 ### Patches
 
-- Put patches in `files/`, named `${PN}-${PV}-<short-description>.patch`
-  (e.g. `rkcommon-1.15.2-fix-type-punning.patch`)
+- Put patches in `files/`, named after the version they were first written
+  for: `${PN}-<version>-<short-description>.patch` (e.g.
+  `rkcommon-1.15.2-fix-type-punning.patch`)
+- Refer to them with that literal version, not `${PV}`/`${P}`
+  (`"${FILESDIR}"/${PN}-1.15.2-fix-type-punning.patch`), so a bump can keep
+  using a patch unchanged. Only add a new file, named for the new version,
+  when the patch itself has to change
 - If a patch comes from an upstream PR, include the PR number in the name
   (e.g. `orcaslicer-2.3.2-pr13557-update-cgal.patch`)
 - Drop patches that are no longer used by any ebuild in the directory
@@ -76,11 +87,13 @@ an `x_mode`:
 
 | `x_mode` | What happens on a new upstream version                                   |
 | -------- | ------------------------------------------------------------------------ |
-| `pr`     | Copy the ebuild, regenerate the Manifest, build it, open a PR. If that fails, Claude tries to fix it |
+| `pr`     | Copy the ebuild, regenerate the Manifest, check and build it, open a PR. If that fails, Claude tries to fix it |
 | `ai`     | Claude does the bump (patches, vendored crates, dependency changes) and opens a draft PR |
 | `issue`  | Only open an issue (for packages too heavy to build on a hosted runner)  |
 
-Bot and Claude commits follow the same rules as everything else in this file.
+Bump PRs drop the previous version unless the package sets `x_drop_old =
+false`. Bot and Claude commits follow the same rules as everything else in
+this file, including the pkgcheck rule above.
 PRs labelled `ai-assisted` contain changes written by Claude; review them like
 any other contribution before marking them ready. Comment `@claude` on an
 issue or PR to have Claude work on it.

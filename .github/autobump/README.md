@@ -22,7 +22,7 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
    therefore stops that version from being proposed again.
 2. **bump** (per package, up to 4 in parallel, 6 h limit) copies the latest
    ebuild to the new version, runs `pkgdev manifest` and `pkgcheck scan --exit
-   error`, and builds it with `emerge`. Dependencies come from Gentoo's official
+   error,warning,style` on the new version, and builds it with `emerge`. Dependencies come from Gentoo's official
    binhost, and distfiles and binpkgs are cached between runs.
    - If that fails, or the package is `x_mode = "ai"`, Claude Code edits the
      new ebuild (deps, patches, `CRATES`, ...). The workflow re-runs pkgcheck
@@ -55,8 +55,9 @@ Mention `@claude` in any issue or PR comment (owner only) to have Claude work
 on it interactively (`.github/workflows/claude.yml`). That runs without
 portage, so the CI workflow on the PR does the build check.
 
-`.github/workflows/ci.yml` runs pkgcheck and builds the changed ebuilds on
-every PR. Add the `skip-build` label for packages too heavy for a hosted
+`.github/workflows/ci.yml` runs `pkgcheck scan --exit error,warning,style` on
+the changed packages and builds the changed ebuilds on every PR (`info`
+findings are shown but don't fail it). Add the `skip-build` label for packages too heavy for a hosted
 runner.
 
 ## Configuring packages
@@ -70,7 +71,7 @@ github = "autobrr/mkbrr"
 use_latest_release = true    # or use_max_tag + include_regex for tag-only projects
 prefix = "v"                 # strip from the tag to get ${PV}
 x_mode = "pr"                # pr | ai | issue (default: issue)
-x_drop_old = true            # also drop the previous ebuild (default: false)
+x_drop_old = false           # keep the previous ebuild (default: true, drop it)
 ```
 
 Use `from_pattern`/`to_pattern` when upstream versions don't map 1:1 to a

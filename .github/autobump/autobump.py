@@ -202,7 +202,7 @@ def cmd_check(args):
             "old": old,
             "new": new,
             "mode": mode,
-            "drop_old": bool(entry.get("x_drop_old", False)),
+            "drop_old": bool(entry.get("x_drop_old", True)),
             "url": event.get("url") or "",
             "slug": cp.replace("/", "_"),
             "key": f"{cp.replace('/', '_')}-{new}",

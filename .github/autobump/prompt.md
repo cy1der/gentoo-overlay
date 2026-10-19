@@ -6,8 +6,9 @@ Upstream release: {{URL}}
 
 The workflow already copied the newest ebuild to {{NEW}} and tried to
 regenerate the Manifest (and, unless noted below, to build it). Your job is to
-make `{{ATOM}}-{{NEW}}` pass `pkgcheck scan --exit error -- {{ATOM}}` and build
-with `emerge --oneshot ={{ATOM}}-{{NEW}}`.
+make `{{ATOM}}-{{NEW}}` pass
+`pkgcheck scan --exit error,warning,style -- ={{ATOM}}-{{NEW}}` and build with
+`emerge --oneshot ={{ATOM}}-{{NEW}}`.
 
 Read `CLAUDE.md` and `CONTRIBUTING.md` first and follow them.
 
@@ -20,9 +21,11 @@ How to approach it:
 2. Update the {{NEW}} ebuild to match: dependencies, `PYTHON_COMPAT`, build
    options, `S`, `SRC_URI`, bundled dependency commits and so on.
 3. Vendored Rust crates: regenerate `CRATES` with `pycargoebuild`.
-4. Patches in `files/`: drop the ones upstream merged, rebase the ones still
-   needed as `${PN}-{{NEW}}-<desc>.patch`, and delete patch files no ebuild uses
-   any more.
+4. Patches in `files/`: remove the ones upstream merged from the {{NEW}}
+   ebuild. Keep using patches that still apply under their existing names. Only
+   when a patch has to change, add the new version as
+   `${PN}-{{NEW}}-<desc>.patch`. Refer to patches with a literal version
+   (`"${FILESDIR}"/${PN}-1.2.3-desc.patch`), never `${P}` or `${PV}`.
 5. Regenerate the Manifest with `pkgdev manifest` from the package directory.
 6. Build with `emerge --oneshot ={{ATOM}}-{{NEW}}` and iterate until it builds
    and pkgcheck is clean.
@@ -33,9 +36,11 @@ Rules:
 - Never weaken the package to get it building: no `RESTRICT=test` unless the
   {{OLD}} ebuild already had it, no disabling features or USE flags, no dropping
   `KEYWORDS`. If it can't be done properly, stop and say why.
-- Stay within the bump. Don't fix pre-existing pkgcheck warnings that the bump
-  doesn't cause, and don't add unrelated files (like a missing
-  `metadata.xml`). List them in your summary instead.
+- The {{NEW}} ebuild must have no `error`, `warning` or `style` pkgcheck
+  findings. Fix them in the {{NEW}} ebuild even if {{OLD}} has them too
+  (`info` findings such as `PythonCompatUpdate` are fine).
+- Otherwise stay within the bump: don't change other ebuilds or add unrelated
+  files. List other problems you notice in your summary instead.
 - You can't change the container's configuration (permissions,
   `/etc/portage`, users). If the environment itself is broken, stop and say
   so in your summary.

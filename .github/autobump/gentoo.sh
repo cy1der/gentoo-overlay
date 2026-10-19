@@ -46,8 +46,10 @@ setup() {
 verify() {
 	local cp=$1 ver=$2 log=$3
 	{
-		echo ">>> pkgcheck scan ${cp}"
-		(cd "${OVERLAY}" && pkgcheck scan --exit error -- "${cp}") > "${OUT}/pkgcheck.txt" 2>&1 \
+		# Only the new version: the previous one may be dropped by this bump, and
+		# CI checks the whole package as it ends up
+		echo ">>> pkgcheck scan =${cp}-${ver}"
+		(cd "${OVERLAY}" && pkgcheck scan --exit error,warning,style -- "=${cp}-${ver}") > "${OUT}/pkgcheck.txt" 2>&1 \
 			|| { cat "${OUT}/pkgcheck.txt"; return 1; }
 		cat "${OUT}/pkgcheck.txt"
 		echo ">>> emerge =${cp}-${ver}"

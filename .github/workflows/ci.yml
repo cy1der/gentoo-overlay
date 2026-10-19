@@ -71,7 +71,8 @@ jobs:
         if: steps.changed.outputs.pkgs != ''
         env:
           PKGS: ${{ steps.changed.outputs.pkgs }}
-        run: docker exec -e PKGS gentoo bash -c 'pkgcheck scan --exit error -- $PKGS'
+        # info findings (e.g. PythonCompatUpdate) are shown but don't fail the check
+        run: docker exec -e PKGS gentoo bash -c 'pkgcheck scan --exit error,warning,style -- $PKGS'
 
       - name: Build
         # Add the skip-build label for packages too heavy for a hosted runner

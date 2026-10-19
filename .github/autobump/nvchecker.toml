@@ -4,7 +4,7 @@
 # the package atom, plus our own keys, which nvchecker ignores:
 #   x_mode     "pr" (mechanical bump, falls back to Claude), "ai" (Claude
 #              does the bump), or "issue" (only open an issue). Default: "issue"
-#   x_drop_old drop the previous ebuild in a second commit. Default: false
+#   x_drop_old drop the previous ebuild in a second commit. Default: true
 
 # --- pr: mechanical bumps ---------------------------------------------------
 
@@ -14,7 +14,6 @@ github = "emmercm/igir"
 use_latest_release = true
 prefix = "v"
 x_mode = "pr"
-x_drop_old = true
 
 ["net-p2p/mkbrr-bin"]
 source = "github"
@@ -22,7 +21,6 @@ github = "autobrr/mkbrr"
 use_latest_release = true
 prefix = "v"
 x_mode = "pr"
-x_drop_old = true
 
 ["net-p2p/mkbrr-gui-bin"]
 source = "github"
@@ -30,7 +28,6 @@ github = "autobrr/mkbrr"
 use_latest_release = true
 prefix = "v"
 x_mode = "pr"
-x_drop_old = true
 
 ["dev-python/proton-core"]
 source = "github"

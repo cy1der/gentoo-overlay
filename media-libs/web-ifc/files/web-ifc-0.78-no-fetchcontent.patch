@@ -1,0 +1,139 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,8 +1,5 @@
+ cmake_minimum_required(VERSION 3.28)
+ cmake_policy(SET CMP0054 NEW)
+
+-# set up cmake to download the external projects
+-include(FetchContent)
+-
+ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+ 	message("Building In Debug Mode")
+@@ -32,62 +30,38 @@
+ file(GLOB_RECURSE web-ifc-source web-ifc/*.cpp)
+ file(GLOB_RECURSE web-ifc-wasm wasm/*.cpp)
+
+-set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
+-
+-# download the external projects and save their paths
+-Message("Downloading FastFloat")
+-FetchContent_Declare(fastfloat GIT_REPOSITORY "https://github.com/fastfloat/fast_float" GIT_TAG "b0ab987b3dfdde13fa1915f65ef2a5c068d9208c" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(fastfloat)
+-
+-Message("Downloading TinyNURBS")
+-FetchContent_Declare(tinynurbs GIT_REPOSITORY "https://github.com/QuimMoya/tinynurbs" GIT_TAG "47115cd9b6e922b27bbc4ab01fdeac2e9ea597a4" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(tinynurbs)
+-
+-Message("Downloading TinyCPPTest")
+-FetchContent_Declare(tinycpptest GIT_REPOSITORY "https://github.com/kovacsv/TinyCppTest" GIT_TAG "12e42c8ac6e032ce450fb3f772ebdfd1ddc6008c" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(tinycpptest)
+-
+-Message("Downloading GLM")
+-FetchContent_Declare(glm GIT_REPOSITORY "https://github.com/g-truc/glm" GIT_TAG "8d1fd52e5ab5590e2c81768ace50c72bae28f2ed" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(glm)
+-
+-Message("Downloading Earcut")
+-FetchContent_Declare(earcut GIT_REPOSITORY "https://github.com/mapbox/earcut.hpp" GIT_TAG "c68c8835ccff2b7532d31d8fa8dfcf398f629498" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(earcut)
+-
+-Message("Downloading CDT")
+-FetchContent_Declare(cdt GIT_REPOSITORY "https://github.com/artem-ogre/CDT" GIT_TAG "2068d015b9db3c92481e869b0c1f669b96a1d70a" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(cdt)
+-
+-Message("Downloading spdlog")
+-FetchContent_Declare(spdlog GIT_REPOSITORY "https://github.com/gabime/spdlog" GIT_TAG "79524ddd08a4ec981b7fea76afd08ee05f83755d" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(spdlog)
+-
+-Message("Downloading StdUUID")
+-FetchContent_Declare(stduuid GIT_REPOSITORY "https://github.com/mariusbancila/stduuid" GIT_TAG "3afe7193facd5d674de709fccc44d5055e144d7a" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(stduuid)
+-
+-Message("Downloading unordered_dense")
+-FetchContent_Declare(unordered_dense GIT_REPOSITORY "https://github.com/martinus/unordered_dense" GIT_TAG "1c8636e810d7e4a485d17bb9cbd6dccb5fe4e284" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(unordered_dense)
+-
+-Message("Downloads Finished")
++find_package(glm REQUIRED)
++find_package(spdlog REQUIRED)
++find_package(FastFloat CONFIG REQUIRED)
++
++set(tinynurbs_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinynurbs")
++set(earcut_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/earcut.hpp")
++set(cdt_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/CDT")
++set(stduuid_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/stduuid")
++set(unordered_dense_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/unordered_dense")
++
++if(BUILD_TESTING)
++	set(tinycpptest_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/TinyCppTest")
++endif()
+
+ function(PARAM_SETTER THE_EXECUTABLE)
+-	target_include_directories(${THE_EXECUTABLE} PUBLIC
+-		$<BUILD_INTERFACE:${glm_SOURCE_DIR}/>
+-		$<BUILD_INTERFACE:${glm_SOURCE_DIR}/glm>
+-	)
++	target_link_libraries(${THE_EXECUTABLE} PUBLIC glm::glm)
++
++	if(TARGET spdlog::spdlog_header_only)
++		target_link_libraries(${THE_EXECUTABLE} PUBLIC spdlog::spdlog_header_only)
++	else()
++		target_link_libraries(${THE_EXECUTABLE} PUBLIC spdlog::spdlog)
++	endif()
++
++	target_link_libraries(${THE_EXECUTABLE} PUBLIC FastFloat::fast_float)
+
+ 	target_include_directories(${THE_EXECUTABLE} PRIVATE
+ 		$<BUILD_INTERFACE:${tinynurbs_SOURCE_DIR}/include>
+-		$<BUILD_INTERFACE:${fastfloat_SOURCE_DIR}/include>
+ 		$<BUILD_INTERFACE:${cdt_SOURCE_DIR}/CDT/include>
+ 		$<BUILD_INTERFACE:${earcut_SOURCE_DIR}/include>
+-		$<BUILD_INTERFACE:${spdlog_SOURCE_DIR}/include>
+ 		$<BUILD_INTERFACE:${stduuid_SOURCE_DIR}/include>
+ 		$<BUILD_INTERFACE:${unordered_dense_SOURCE_DIR}/include>
+ 	)
+
+ 	if(NOT MSVC)
+ 		target_compile_options(${THE_EXECUTABLE} PRIVATE -Wall -Wextra -Wpedantic)
+@@ -193,17 +167,19 @@
+ 	)
+
+ 	# build parameters for web-ifc-test
+-	add_executable(web-ifc-test ${web-ifc-source} "./test/encoding_test.cpp" "./test/main.cpp" "./test/io_helpers.cpp")
+-	param_setter(web-ifc-test)
+-	target_include_directories(web-ifc-test PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
+-
+-	add_test(web-ifc-test web-ifc-test)
+-	set_tests_properties(web-ifc-test PROPERTIES LABELS "web-ifc")
+-
+-	# build parameters for web-ifc in testing environment
+-	add_executable(web-ifc ${web-ifc-source} "./test/web-ifc-test.cpp" "./test/io_helpers.cpp")
+-	param_setter(web-ifc)
+-	target_include_directories(web-ifc PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
++	if(BUILD_TESTING)
++		add_executable(web-ifc-test ${web-ifc-source} "./test/encoding_test.cpp" "./test/main.cpp" "./test/io_helpers.cpp")
++		param_setter(web-ifc-test)
++		target_include_directories(web-ifc-test PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
++
++		add_test(web-ifc-test web-ifc-test)
++		set_tests_properties(web-ifc-test PROPERTIES LABELS "web-ifc")
++
++		# build parameters for web-ifc in testing environment
++		add_executable(web-ifc ${web-ifc-source} "./test/web-ifc-test.cpp" "./test/io_helpers.cpp")
++		param_setter(web-ifc)
++		target_include_directories(web-ifc PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
++	endif()
+
+ 	# comment these to prevent debug files being generated
+ 	if(NOT RELEASE)
+@@ -237,11 +213,6 @@
+ 		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/web-ifc
+ 	)
+
+-	# Install bundled dependency headers (all header-only)
+-	install(DIRECTORY ${glm_SOURCE_DIR}/glm
+-		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+-	)
+-
+ 	# Export targets with namespace
+ 	install(EXPORT web-ifc-targets
+ 		FILE web-ifc-targets.cmake

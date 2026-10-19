@@ -5,7 +5,7 @@ EAPI=8
 
 inherit cmake
 
-DESCRIPTION="Library for compressing and decompressing 3D geometric meshes and point clouds."
+DESCRIPTION="Library for compressing and decompressing 3D geometric meshes and point clouds"
 HOMEPAGE="https://google.github.io/draco"
 SRC_URI="https://github.com/google/draco/archive/refs/tags/${PV}.tar.gz -> ${P}.tar.gz"
 

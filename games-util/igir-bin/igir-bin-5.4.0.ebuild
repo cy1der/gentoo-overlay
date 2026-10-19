@@ -3,11 +3,11 @@
 
 EAPI=8
 
-DESCRIPTION="A zero-setup ROM collection manager that sorts, filters, extracts or archives, patches, and reports on collections of any size on any OS."
+DESCRIPTION="Zero-setup ROM collection manager that sorts, filters, extracts and patches ROMs"
 HOMEPAGE="https://igir.io/"
 SRC_URI="
-    amd64? ( https://github.com/emmercm/igir/releases/download/v${PV}/igir-${PV}-Linux-amd64.tar.gz )
-    arm64? ( https://github.com/emmercm/igir/releases/download/v${PV}/igir-${PV}-Linux-arm64v8.tar.gz )
+	amd64? ( https://github.com/emmercm/igir/releases/download/v${PV}/igir-${PV}-Linux-amd64.tar.gz )
+	arm64? ( https://github.com/emmercm/igir/releases/download/v${PV}/igir-${PV}-Linux-arm64v8.tar.gz )
 "
 S="${WORKDIR}/${P}"
 

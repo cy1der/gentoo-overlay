@@ -68,7 +68,7 @@ with the package atom as the scope:
   using a patch unchanged. Only add a new file, named for the new version,
   when the patch itself has to change
 - If a patch comes from an upstream PR, include the PR number in the name
-  (e.g. `orcaslicer-2.3.2-pr13557-update-cgal.patch`)
+  (`${PN}-<version>-pr<number>-<short-description>.patch`)
 - Drop patches that are no longer used by any ebuild in the directory
 
 ### Binary packages

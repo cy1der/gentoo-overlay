@@ -159,14 +159,6 @@ include_regex = '^v\d+(\.\d+)*$'
 prefix = "v"
 x_mode = "issue"
 
-["media-gfx/orcaslicer"]
-source = "github"
-github = "OrcaSlicer/OrcaSlicer"
-use_max_tag = true
-include_regex = '^v\d+(\.\d+)*$'
-prefix = "v"
-x_mode = "issue"
-
 ["media-libs/web-ifc"]
 source = "github"
 github = "ThatOpen/engine_web-ifc"

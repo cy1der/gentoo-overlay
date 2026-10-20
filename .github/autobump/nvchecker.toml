@@ -83,27 +83,27 @@ use_max_tag = true
 include_regex = '^\d+(\.\d+)*$'
 x_mode = "pr"
 
-# --- ai: patches, vendored crates or bundled deps ----------------------------
-
 ["dev-python/proton-vpn-api-core"]
 source = "github"
 github = "ProtonVPN/python-proton-vpn-api-core"
 use_max_tag = true
 include_regex = '^v\d+(\.\d+)*$'
 prefix = "v"
-x_mode = "ai"
-
-["net-vpn/proton-vpn-daemon"]
-source = "github"
-github = "ProtonVPN/proton-vpn-daemon"
-use_max_tag = true
-include_regex = '^v\d+(\.\d+)*$'
-prefix = "v"
-x_mode = "ai"
+x_mode = "pr"
 
 ["media-libs/rkcommon"]
 source = "github"
 github = "RenderKit/rkcommon"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "pr"
+
+# --- ai: patches, vendored crates or bundled deps ----------------------------
+
+["net-vpn/proton-vpn-daemon"]
+source = "github"
+github = "ProtonVPN/proton-vpn-daemon"
 use_max_tag = true
 include_regex = '^v\d+(\.\d+)*$'
 prefix = "v"
@@ -125,13 +125,6 @@ include_regex = '^v\d+(\.\d+)*$'
 prefix = "v"
 x_mode = "ai"
 
-["media-libs/web-ifc"]
-source = "github"
-github = "ThatOpen/engine_web-ifc"
-use_max_tag = true
-include_regex = '^\d+(\.\d+)*$'
-x_mode = "ai"
-
 ["media-libs/materialx"]
 source = "github"
 github = "AcademySoftwareFoundation/MaterialX"
@@ -140,7 +133,7 @@ include_regex = '^v\d+(\.\d+)*$'
 prefix = "v"
 x_mode = "ai"
 
-# --- issue: too heavy to build on a hosted runner ----------------------------
+# --- issue: too heavy for a hosted runner, or needs a manual check ---------
 
 ["sci-libs/vtk"]
 source = "github"
@@ -172,4 +165,12 @@ github = "OrcaSlicer/OrcaSlicer"
 use_max_tag = true
 include_regex = '^v\d+(\.\d+)*$'
 prefix = "v"
+x_mode = "issue"
+
+["media-libs/web-ifc"]
+source = "github"
+github = "ThatOpen/engine_web-ifc"
+use_max_tag = true
+include_regex = '^\d+(\.\d+)*$'
+# Bumps can break media-gfx/f3d[web-ifc], which CI doesn't build; check by hand
 x_mode = "issue"

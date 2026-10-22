@@ -14,6 +14,7 @@ import base64
 import functools
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -297,10 +298,49 @@ def tail(path, lines=60):
     return "\n".join(path.read_text(errors="replace").splitlines()[-lines:])
 
 
-def details(summary, body, lang=""):
+def details(summary, body, lang="", markdown=False):
     if not body.strip():
         return ""
-    return f"<details><summary>{summary}</summary>\n\n```{lang}\n{body}\n```\n\n</details>\n"
+    if not markdown:
+        body = f"```{lang}\n{body}\n```"
+    return f"<details><summary>{summary}</summary>\n\n{body}\n\n</details>\n"
+
+
+def small(text):
+    return f"\n<sup><sub>{text}</sub></sup>\n"
+
+
+def headline(cp, old, new, url):
+    version = f"[{new}]({url})" if url else new
+    return f"`{cp}` {version} (we have {old})"
+
+
+def changelog(url, limit=20000):
+    """The GitHub release notes behind an nvchecker url, as a collapsed section."""
+    m = re.fullmatch(r"https://github\.com/([^/]+/[^/]+)/releases/tag/(.+)", url or "")
+    if not m:
+        return ""
+    repo, tag = m.groups()
+    try:
+        release = api("GET", f"/repos/{repo}/releases/tags/{q(urllib.parse.unquote(tag))}")
+    except RuntimeError as e:  # the issue or PR is still useful without them
+        log(f"{repo}: could not fetch release notes: {e}")
+        return ""
+    notes = ((release or {}).get("body") or "").strip()
+    if not notes:
+        return ""
+    if len(notes) > limit:
+        notes = notes[:limit].rsplit("\n", 1)[0] + f"\n\n... [Full release notes]({url})"
+    # Keep upstream's mentions and references from pinging people or showing
+    # up on upstream's issues, and point bare #123 at upstream instead of here
+    notes = re.sub(r"(?<!\w)@(?=[A-Za-z0-9])", "@\u200b", notes)
+    notes = re.sub(r"https://github\.com/(?=[^/\s]+/[^/\s]+/(?:issues|pull|discussions)/)", "https://redirect.github.com/", notes)
+    notes = re.sub(
+        r"(?<![\w/&\[])(?:([\w.-]+/[\w.-]+))?#(\d+)\b",
+        lambda m: f"[{m[0]}](https://redirect.github.com/{m[1] or repo}/issues/{m[2]})",
+        notes,
+    )
+    return details("Changelog", notes, markdown=True)
 
 
 def open_issue(item, body, labels):
@@ -401,19 +441,20 @@ def publish_result(result_dir, item):
     cp, old, new, status = res["atom"], res["old"], res["new"], res["status"]
     # Changes carried over from an ai-assisted PR still need a careful review
     ai = status == "ai" or (status != "failed" and item.get("base_ai", False))
-    release = f"Upstream release: {res['url']}\n\n" if res["url"] else ""
+    notes = changelog(res["url"])
     ai_summary = (result_dir / "ai-summary.md").read_text() if (result_dir / "ai-summary.md").exists() else ""
     pkgcheck = tail(result_dir / "pkgcheck.txt", 40)
     build = tail(result_dir / "build.log", 60)
 
     if status == "failed":
         body = (
-            f"Automation could not bump `{cp}` from {old} to {new} (mode `{res['mode']}`).\n\n"
-            + release
+            f"{headline(cp, old, new, res['url'])}.\n\n"
+            + "Autobump failed.\n\n"
             + (f"## Claude's notes\n\n{ai_summary}\n\n" if ai_summary else "")
+            + notes
             + details("pkgcheck", pkgcheck)
             + details("Build log (tail)", build)
-            + "\nComment `@claude <instructions>` to have Claude try again, or bump it by hand.\n"
+            + small("Comment `@claude <instructions>` to have Claude try again, or bump it by hand.")
         )
         open_issue(res, body, ["autobump", "needs-human"])
         return
@@ -428,28 +469,14 @@ def publish_result(result_dir, item):
         commits.append((drop, f"chore({cp}): drop {old}"))
     push_commits(branch, commits)
 
-    if status == "ai":
-        intro = (
-            "Claude made changes beyond a plain version bump. **Review the diff carefully** "
-            "before marking this ready.\n\n"
-            f"## Claude's summary\n\n{ai_summary or '(no summary written)'}\n\n"
-        )
-    else:
-        intro = "Mechanical bump: the ebuild was copied unchanged and the Manifest regenerated.\n\n"
-    if item.get("base_pr"):
-        intro = (
-            f"Builds on #{item['base_pr']}, which this supersedes: its changes are carried over"
-            + (" and include work by Claude, so **review them carefully**" if item.get("base_ai") else "")
-            + ".\n\n"
-            + intro
-        )
     body = (
-        f"Bumps `{cp}` from {old} to {new}.\n\n"
-        + release
-        + intro
-        + "pkgcheck passed and `emerge` built the new version in a `gentoo/stage3` container.\n\n"
+        f"{headline(cp, old, new, res['url'])}.\n\n"
+        + (f"Supersedes #{item['base_pr']}.\n\n" if item.get("base_pr") else "")
+        + (f"## Claude's summary\n\n{ai_summary or '(no summary written)'}\n\n" if status == "ai" else "")
+        + notes
         + details("pkgcheck", pkgcheck)
         + details("Build log (tail)", build)
+        + small("Comment `@claude <instructions>` to have Claude make changes.")
     )
     pr = api(
         "POST",
@@ -483,10 +510,9 @@ def cmd_publish(args):
     plan = json.loads(Path(args.plan).read_text()) if args.plan else {"issue": []}
     for item in plan["issue"]:
         body = (
-            f"`{item['atom']}` {item['new']} is available (we have {item['old']}).\n\n"
-            + (f"Upstream release: {item['url']}\n\n" if item["url"] else "")
-            + "This package is set to `x_mode = \"issue\"` in `.github/autobump/nvchecker.toml`, "
-            "so it needs a manual bump. Comment `@claude <instructions>` for help.\n"
+            f"{headline(item['atom'], item['old'], item['new'], item['url'])}.\n\n"
+            + changelog(item["url"])
+            + small("Comment `@claude <instructions>` for help.")
         )
         try:
             open_issue(item, body, ["autobump"])

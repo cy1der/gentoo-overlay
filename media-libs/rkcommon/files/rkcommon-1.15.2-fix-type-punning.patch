@@ -9,3 +9,4 @@
 +      std::memcpy(&scale, &scaleBits, sizeof(scale));
        return (scale * rng()) * diff + lower;
      }
+ 

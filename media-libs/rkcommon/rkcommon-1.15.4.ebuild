@@ -19,3 +19,12 @@ PATCHES=(
 
 RDEPEND=">=dev-cpp/tbb-4.4.3"
 DEPEND="${RDEPEND}"
+
+src_configure() {
+	local mycmakeargs=(
+		# The tests download Catch2 at configure time
+		-DBUILD_TESTING=OFF
+	)
+
+	cmake_src_configure
+}

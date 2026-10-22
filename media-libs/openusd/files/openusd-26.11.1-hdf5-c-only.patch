@@ -1,0 +1,14 @@
+--- a/cmake/defaults/Packages.cmake
++++ b/cmake/defaults/Packages.cmake
+@@ -302,8 +302,11 @@
+     find_package(Alembic REQUIRED)
+     set(REQUIRES_Imath TRUE)
+     if (PXR_ENABLE_HDF5_SUPPORT)
++        # Only the C library is used, so don't let FindHDF5 also require
++        # the C++ bindings because CXX is an enabled language.
+         find_package(HDF5 REQUIRED
+             COMPONENTS
++                C
+                 HL
+             REQUIRED
+         )

@@ -14,6 +14,12 @@ with the package atom as the scope:
 - Make one logical change per commit, and touch one package per commit
 - Add a body (after a blank line) only when the *why* isn't obvious, e.g.
   linking an upstream issue or explaining a workaround.
+- If the contribution closes an open issue, directly under the summary add `Closes #<issue number>`. For example:
+
+```
+chore(media-libs/openusd): version 26.11.1
+Closes #17
+```
 
 ### Types
 

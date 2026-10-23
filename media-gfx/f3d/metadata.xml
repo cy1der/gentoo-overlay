@@ -17,8 +17,9 @@
   <use>
     <flag name="alembic">Support for ABC file format</flag>
     <flag name="assimp">Support for FBX, DAE, OFF, DXF, X and 3MF file formats</flag>
-    <flag name="clipboard">Support for clipboard interaction using provided clip (experimental)</flag>
+    <flag name="clipboard">Support for clipboard interaction using provided clip</flag>
     <flag name="draco">Support for DRC file format</flag>
+    <flag name="ffmpeg">Support for encoding animations to video files with <pkg>media-video/ffmpeg</pkg></flag>
     <flag name="hdf">Support for VTKHDF (.vtkhdf), ExodusII (.ex2), and NetCDF (.nc) file formats</flag>
     <flag name="imgui">Support for ImGui widgets</flag>
     <flag name="opencascade">Support for STEP, IGES, BREP, and XBF file formats</flag>

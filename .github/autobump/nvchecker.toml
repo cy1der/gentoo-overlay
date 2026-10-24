@@ -134,6 +134,14 @@ include_regex = '^v\d+(\.\d+)*$'
 prefix = "v"
 x_mode = "ai"
 
+["games-emulation/lantern-engine"]
+source = "github"
+github = "Awakenchan/LanternEngine"
+use_latest_release = true
+prefix = "v"
+# NUGETS and the patches may change with each release
+x_mode = "ai"
+
 # --- issue: too heavy for a hosted runner, or needs a manual check ---------
 
 ["sci-libs/vtk"]

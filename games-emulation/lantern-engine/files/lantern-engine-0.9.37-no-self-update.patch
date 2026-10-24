@@ -1,0 +1,15 @@
+Portage manages updates: turn off the launcher's self-update on Linux. The
+launcher already handles this (no check at start, install buttons hidden,
+a pointer to the releases page).
+
+--- a/launcher/windows/BloodborneLauncher/Core/Updater.cs
++++ b/launcher/windows/BloodborneLauncher/Core/Updater.cs
+@@ -470,7 +470,7 @@
+ #if AVALONIA
+         /// <summary>Whether this launcher can update itself: releases carry the Windows package and the
+         /// Linux one (LanternEngine-v&lt;version&gt;-linux-x64.tar.gz, with this launcher inside).</summary>
+-        public static bool Supported => OperatingSystem.IsWindows() || OperatingSystem.IsLinux();
++        public static bool Supported => OperatingSystem.IsWindows();
+ 
+ #endif
+         /// <summary>Removes the exe an update moved aside (it was still running then).</summary>

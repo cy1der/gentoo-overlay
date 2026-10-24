@@ -1,0 +1,27 @@
+Build fixes for GCC and the Vulkan-Hpp in ::gentoo:
+- set preferredLargeHeapBlockSize once, in declaration order: GCC rejects a
+  field designated twice (clang only warns)
+- name the type when resetting hdr_format: "= {}" is ambiguous between
+  vk::SurfaceFormatKHR's two operator= overloads
+
+--- a/engine/gpu/shadps4/video_core/renderer_vulkan/vk_instance.cpp
++++ b/engine/gpu/shadps4/video_core/renderer_vulkan/vk_instance.cpp
+@@ -991,7 +991,6 @@
+     }();
+     const VmaAllocatorCreateInfo allocator_info = {
+         .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
+-        .preferredLargeHeapBlockSize = block_size,
+         .physicalDevice = physical_device,
+         .device = *device,
+         .preferredLargeHeapBlockSize = block_size,
+--- a/engine/gpu/shadps4/video_core/renderer_vulkan/vk_swapchain.cpp
++++ b/engine/gpu/shadps4/video_core/renderer_vulkan/vk_swapchain.cpp
+@@ -388,7 +388,7 @@
+     if ((features & composite_features) != composite_features) {
+         std::printf("HDR output: %s cannot hold the SDR picture for the encode; staying SDR\n",
+                     vk::to_string(surface_format.format).c_str());
+-        hdr_format = {};
++        hdr_format = vk::SurfaceFormatKHR{};
+         return;
+     }
+     const float display_peak = settings.hdr_display_peak.load();

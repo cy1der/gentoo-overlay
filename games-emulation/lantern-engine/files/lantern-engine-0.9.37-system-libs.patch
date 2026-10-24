@@ -1,0 +1,74 @@
+Use system SPIRV-Headers, half, cpp-httplib and libatrac9 instead of the
+bundled copies, and drop -Werror from the bundled sirit.
+
+--- a/engine/gpu/bbnet/CMakeLists.txt
++++ b/engine/gpu/bbnet/CMakeLists.txt
+@@ -5,6 +5,7 @@
+ find_package(nlohmann_json CONFIG REQUIRED GLOBAL)
+ find_package(OpenSSL REQUIRED GLOBAL)
+ find_package(ZLIB REQUIRED GLOBAL)
++find_package(httplib REQUIRED)
+ set(BBNET_VENDOR ${CMAKE_CURRENT_SOURCE_DIR}/vendor/shadps4)
+ set(BBNET_PROTO_OUT ${CMAKE_CURRENT_BINARY_DIR}/proto)
+ file(MAKE_DIRECTORY ${BBNET_PROTO_OUT})
+@@ -20,12 +21,13 @@
+ file(GLOB BBNET_THD_SOURCES CONFIGURE_DEPENDS thd/*.cpp)
+ add_library(bbnet STATIC ${BBNET_SOURCES} ${BBNET_THD_SOURCES} ${BBNET_PROTO_OUT}/shadnet.pb.cc bbnet_glue.cpp)
+ target_include_directories(bbnet PRIVATE include ../shim ${BBNET_VENDOR}
+-    ${BBNET_VENDOR}/shadnet ../shadps4 ${BBNET_PROTO_OUT} ../third_party/imgui third_party/httplib)
++    ${BBNET_VENDOR}/shadnet ../shadps4 ${BBNET_PROTO_OUT} ../third_party/imgui)
+ target_compile_definitions(bbnet PRIVATE BOOST_ASIO_STANDALONE NDEBUG
+     CPPHTTPLIB_OPENSSL_SUPPORT CPPHTTPLIB_ZLIB_SUPPORT)
+ target_compile_options(bbnet PRIVATE -Wno-deprecated-declarations -Wno-missing-field-initializers)
+ target_link_libraries(bbnet PUBLIC Vulkan::Headers fmt::fmt Boost::headers magic_enum::magic_enum
+-    protobuf::libprotobuf nlohmann_json::nlohmann_json OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB)
++    protobuf::libprotobuf nlohmann_json::nlohmann_json OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB
++    httplib::httplib)
+ # miniupnpc, static (MSYS2's on Windows; packaging/linux/setup-ubuntu.sh builds it into /opt/deps).
+ find_path(BBNET_MINIUPNPC_INCLUDE miniupnpc.h PATH_SUFFIXES miniupnpc REQUIRED)
+ find_library(BBNET_MINIUPNPC_LIBRARY NAMES libminiupnpc.a miniupnpc REQUIRED)
+--- a/engine/gpu/CMakeLists.txt
++++ b/engine/gpu/CMakeLists.txt
+@@ -113,8 +113,9 @@
+     FetchContent_MakeAvailable(xbyak)
+ endif()
+ find_program(GLSLANG_COMPILER NAMES glslang glslangValidator REQUIRED)
++find_path(HALF_INCLUDE_DIR half.hpp PATH_SUFFIXES half REQUIRED)
+ 
+-set(SIRIT_USE_SYSTEM_SPIRV_HEADERS OFF CACHE BOOL "" FORCE)
++set(SIRIT_USE_SYSTEM_SPIRV_HEADERS ON CACHE BOOL "" FORCE)
+ add_subdirectory(third_party/sirit EXCLUDE_FROM_ALL)
+ 
+ # bbport: FSR 3.1 temporal upscaling / frame generation, native Vulkan (MIT, FireBurn/FSR-Vulkan).
+@@ -241,7 +242,7 @@
+ # Keyboard prompts' keycaps (shim/engine/keycap_art.cpp): Roboto Medium (Apache License 2.0).
+ set_source_files_properties(shim/engine/keycap_art.cpp PROPERTIES
+     OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/misc/fonts/Roboto-Medium.ttf)
+-target_include_directories(bbgpu PRIVATE shim shadps4 ${SHADER_INCLUDE} third_party/gcn/include third_party/half/include)
++target_include_directories(bbgpu PRIVATE shim shadps4 ${SHADER_INCLUDE} third_party/gcn/include ${HALF_INCLUDE_DIR})
+ # bbport: NVIDIA Streamline SDK headers (MIT), for DLSS Frame Generation (vk_streamline.cpp).
+ target_include_directories(bbgpu PRIVATE third_party/streamline/include)
+ target_compile_definitions(bbgpu PRIVATE BOOST_ASIO_STANDALONE NDEBUG)
+--- a/engine/gpu/third_party/sirit/CMakeLists.txt
++++ b/engine/gpu/third_party/sirit/CMakeLists.txt
+@@ -76,8 +76,7 @@
+         -Wno-missing-braces
+         -Wconversion
+         -Wsign-conversion
+-        -Wshadow
+-        -Werror)
++        -Wshadow)
+ endif()
+ 
+ # Enable unit-testing.
+--- a/engine/src/runtime_ajm.c
++++ b/engine/src/runtime_ajm.c
+@@ -3,7 +3,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+-#include "third_party/LibAtrac9/C/src/libatrac9.h"
++#include <libatrac9.h>
+ 
+ #define ERR_INVALID_CONTEXT ((int32_t)0x80930002)
+ #define ERR_INVALID_INSTANCE ((int32_t)0x80930003)

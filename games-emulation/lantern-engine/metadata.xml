@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<upstream>
+		<remote-id type="github">Awakenchan/LanternEngine</remote-id>
+	</upstream>
+	<longdescription>
+		Lantern Engine runs your own copy of Bloodborne (CUSA03173, update 1.09) on a PC: the
+		game's own x86-64 code runs natively on the CPU, a runtime written for this one game
+		stands in for the PS4's system libraries, and its graphics are translated to Vulkan.
+		No game files are included.
+	</longdescription>
+	<use>
+		<flag name="dlss">Install NVIDIA's proprietary DLSS Super Resolution runtime (RTX GPUs with the NVIDIA driver)</flag>
+		<flag name="gui">Build the Avalonia launcher (settings, mods, controls, game setup)</flag>
+	</use>
+</pkgmetadata>

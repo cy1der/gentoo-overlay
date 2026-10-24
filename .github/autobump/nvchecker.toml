@@ -167,3 +167,12 @@ use_max_tag = true
 include_regex = '^\d+(\.\d+)*$'
 # Bumps can break media-gfx/f3d[web-ifc], which CI doesn't build; check by hand
 x_mode = "issue"
+
+["media-libs/libatrac9"]
+source = "github"
+github = "Thealexbarney/LibAtrac9"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+# Packaged from a snapshot newer than the last tag; a new tag still needs a look
+x_mode = "issue"

@@ -36,8 +36,10 @@ export PYTHON=${PYTHON:-@PYTHON@}
 
 case ${0##*/} in
 	*-launcher)
-		# The launcher finds the engine from its working directory.
+		# The launcher finds the engine from its working directory, and points "Add to Steam"
+		# at this script.
 		cd -- "${home}"
+		export LANTERN_ENGINE_LAUNCHER=@LAUNCHER_SCRIPT@
 		for DOTNET_ROOT in @DOTNET_ROOTS@; do
 			[[ -d ${DOTNET_ROOT} ]] && break
 		done

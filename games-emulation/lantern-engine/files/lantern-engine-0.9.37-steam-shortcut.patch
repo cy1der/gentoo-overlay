@@ -1,0 +1,22 @@
+"Add to Steam" on Linux points the shortcut at the launcher binary itself, which
+only starts from upstream's self-contained package. Use the script that started
+the launcher instead (it sets DOTNET_ROOT and the working directory) when it
+says where it is.
+
+--- a/launcher/windows/LanternLauncher/Views/PlayPage.cs
++++ b/launcher/windows/LanternLauncher/Views/PlayPage.cs
+@@ -319,9 +319,12 @@
+         private void AddToSteam()
+         {
+             // Windows: Bloodborne.exe, which starts the game with the launcher's settings and waits for
+-            // it. Elsewhere the launcher itself with --play, which does the same.
++            // it. Elsewhere the launcher itself with --play, which does the same: through the script
++            // that starts it (LANTERN_ENGINE_LAUNCHER) when there is one.
+             var windows = OperatingSystem.IsWindows();
+-            var exe = windows ? Path.Combine(Paths.PortDir, "Bloodborne.exe") : Environment.ProcessPath ?? "";
++            var exe = windows ? Path.Combine(Paths.PortDir, "Bloodborne.exe")
++                : Environment.GetEnvironmentVariable("LANTERN_ENGINE_LAUNCHER") is { Length: > 0 } script ? script
++                : Environment.ProcessPath ?? "";
+             if (!File.Exists(exe))
+             {
+                 Prompt.Tell(L.T("Add to Steam"), L.T("Bloodborne.exe is missing from the Lantern Engine folder: reinstall the package."));

@@ -119,6 +119,7 @@ BDEPEND="
 PATCHES=(
 	"${FILESDIR}"/${PN}-0.9.37-build-fixes.patch
 	"${FILESDIR}"/${PN}-0.9.37-no-self-update.patch
+	"${FILESDIR}"/${PN}-0.9.37-steam-shortcut.patch
 	"${FILESDIR}"/${PN}-0.9.37-system-libs.patch
 )
 
@@ -280,6 +281,7 @@ src_install() {
 	sed -e "s|@DIST@|${EPREFIX}${dist}|" \
 		-e "s|@PYTHON@|${PYTHON}|" \
 		-e "s|@LAUNCHER@|${EPREFIX}/usr/share/${PN}/launcher/Lantern Engine|" \
+		-e "s|@LAUNCHER_SCRIPT@|${EPREFIX}/usr/bin/${PN}-launcher|" \
 		-e "s|@DOTNET_ROOTS@|${dotnet_roots}|" \
 		"${FILESDIR}"/${PN}-0.9.37-wrapper.sh > "${T}"/${PN} || die
 	dobin "${T}"/${PN}

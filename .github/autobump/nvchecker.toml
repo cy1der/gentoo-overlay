@@ -92,6 +92,14 @@ include_regex = '^v\d+(\.\d+)*$'
 prefix = "v"
 x_mode = "pr"
 
+["dev-util/vulkan-memory-allocator"]
+source = "github"
+github = "GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator"
+use_max_tag = true
+include_regex = '^v\d+(\.\d+)*$'
+prefix = "v"
+x_mode = "pr"
+
 # --- ai: patches, vendored crates or bundled deps ----------------------------
 
 ["net-vpn/proton-vpn-daemon"]

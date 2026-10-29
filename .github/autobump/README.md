@@ -23,7 +23,9 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
 2. **bump** (per package, up to 4 in parallel, 6 h limit) copies the latest
    ebuild to the new version, runs `pkgdev manifest` and `pkgcheck scan --exit
    error,warning,style` on the new version, and builds it with `emerge`. Dependencies come from Gentoo's official
-   binhost, and distfiles and binpkgs are cached between runs.
+   binhost, and distfiles and binpkgs are cached between runs. Dependencies
+   that are only `~amd64` in ::gentoo are keyworded automatically
+   (`--autounmask-keep-keywords=n`), but `package.mask` is respected.
    - If that fails, or the package is `x_mode = "ai"`, Claude Code edits the
      new ebuild (deps, patches, `CRATES`, ...). The workflow re-runs pkgcheck
      and emerge after each round; Claude saying it's done isn't enough.

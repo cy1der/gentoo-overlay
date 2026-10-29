@@ -24,12 +24,13 @@ setup() {
 	# The workflows mount ::gentoo from the gentoo/portage image, which avoids
 	# emerge-webrsync's dependency on a reachable OpenPGP keyserver
 	[[ -d /var/db/repos/gentoo/metadata ]] || emerge-webrsync --quiet
+	# Some ebuilds may need ~amd64 deps from ::gentoo
 	cat >> /etc/portage/make.conf <<-EOF
 		FEATURES="\${FEATURES} getbinpkg buildpkg -ipc-sandbox -network-sandbox -pid-sandbox"
 		ACCEPT_LICENSE="*"
 		MAKEOPTS="-j$(nproc)"
 		CONFIG_PROTECT_MASK="/etc/portage"
-		EMERGE_DEFAULT_OPTS="--quiet-build=y --autounmask-continue=y"
+		EMERGE_DEFAULT_OPTS="--quiet-build=y --autounmask-continue=y --autounmask-keep-keywords=n"
 	EOF
 	mkdir -p /etc/portage/repos.conf /etc/portage/package.accept_keywords
 	# pkgcore ignores portage's built-in default once /etc/portage/repos.conf exists

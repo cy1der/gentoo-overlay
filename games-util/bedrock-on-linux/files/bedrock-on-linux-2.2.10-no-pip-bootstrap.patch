@@ -1,0 +1,64 @@
+Portage provides the Python dependencies: never pip-install them into the
+user's site-packages (with --break-system-packages) when one is missing,
+unless BOL_NO_PIP=0 asks for it. Point at USE=gui instead of pip.
+
+--- a/bol/cli.py
++++ b/bol/cli.py
+@@ -171,9 +171,8 @@
+     # imported, and works without it.
+     if not deps.have("PySide6") and "PySide6" in deps.ensure_gui_deps():
+         die("The launcher window needs the Qt toolkit (PySide6), which is "
+-            "not installed here and could not be installed automatically. "
+-            "Install it with pip, or use the AppImage, Flatpak, .deb or .rpm "
+-            f"— each of those carries it. `{APP} play` needs none of it.")
++            "not installed here. Emerge games-util/bedrock-on-linux with "
++            f"USE=gui to get it. `{APP} play` needs none of it.")
+     # Qt picks its platform when it starts, so before bol.gui is imported.
+     _prefer_x11_on_chromeos()
+     try:
+--- a/bol/deps.py
++++ b/bol/deps.py
+@@ -102,7 +102,7 @@
+     missing = missing_login_deps()
+     if not missing or not install:
+         return missing
+-    if os.environ.get("BOL_NO_PIP") == "1":
++    if os.environ.get("BOL_NO_PIP", "1") == "1":
+         return missing
+     info(f"Installing Python dependencies for login: {', '.join(missing)} …")
+     if _pip_install(LOGIN_DEPS[m] for m in missing):
+@@ -142,7 +142,7 @@
+     """Ensure the GUI toolkit is importable; pip-install it when missing and
+     allowed. Returns import-names still missing (empty == ready). Never raises."""
+     missing = missing_gui_deps()
+-    if not missing or not install or os.environ.get("BOL_NO_PIP") == "1":
++    if not missing or not install or os.environ.get("BOL_NO_PIP", "1") == "1":
+         return missing
+     info(f"Installing the GUI toolkit: {', '.join(missing)} …")
+     if _pip_install(GUI_INSTALL_REQUIREMENTS):
+--- a/bol/doctor.py
++++ b/bol/doctor.py
+@@ -85,7 +85,7 @@
+     find rather than reporting it as ready.
+     """
+     if not deps.have("PySide6"):
+-        return "auto-installed on launch"
++        return "not installed (emerge with USE=gui)"
+     error = deps.gui_import_error()
+     if not error:
+         return "OK (GUI)"
+--- a/tests/test_gui_toolkit_report.py
++++ b/tests/test_gui_toolkit_report.py
+@@ -37,10 +37,10 @@
+             self.assertEqual(doctor.gui_toolkit_summary(), "OK (GUI)")
+ 
+     def test_a_toolkit_that_is_not_installed_yet_is_not_a_failure(self):
+-        # The portable .pyz and a bare checkout install it on first launch.
++        # Built with USE=-gui: the command line works without it.
+         with mock.patch.object(deps, "have", return_value=False):
+             self.assertEqual(doctor.gui_toolkit_summary(),
+-                             "auto-installed on launch")
++                             "not installed (emerge with USE=gui)")
+ 
+     def test_an_installed_toolkit_that_cannot_load_names_the_library(self):
+         # What `have()` alone reported as "OK (GUI)" on the machine in #205,

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<upstream>
+		<remote-id type="github">Wyze3306/BedrockOnLinux</remote-id>
+		<bugs-to>https://github.com/Wyze3306/BedrockOnLinux/issues</bugs-to>
+		<changelog>https://github.com/Wyze3306/BedrockOnLinux/blob/main/CHANGELOG.md</changelog>
+	</upstream>
+	<longdescription>
+		BedrockOnLinux is a launcher for the Windows (GDK) edition of Minecraft
+		Bedrock. It downloads a WineGDK-based engine and the game from the
+		Microsoft Store, signs in to Microsoft/Xbox natively and enables
+		Friends, Servers, Realms and file imports. No game files are included.
+	</longdescription>
+	<use>
+		<flag name="crossdev-mingw">
+			Use <pkg>sys-devel/crossdev</pkg> for the toolchain rather than
+			<pkg>dev-util/mingw64-toolchain</pkg> (requires manual setting up
+			and is mostly unsupported, try disabling if have issues)
+		</flag>
+		<flag name="gui">Install the Qt launcher window (<pkg>dev-python/pyside</pkg>) and its desktop entry; without it only the command line is available</flag>
+		<flag name="webkit">Use the system <pkg>net-libs/webkit-gtk</pkg> for the Microsoft sign-in window instead of the WebKitGTK bundle the launcher downloads</flag>
+	</use>
+</pkgmetadata>

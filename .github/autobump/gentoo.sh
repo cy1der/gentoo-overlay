@@ -14,7 +14,7 @@ AUTOBUMP=(python3 "${OVERLAY}/.github/autobump/autobump.py")
 CLAUDE_ROUNDS=${CLAUDE_ROUNDS:-3}
 CLAUDE_MAX_TURNS=${CLAUDE_MAX_TURNS:-80}
 export PATH="${HOME}/.local/bin:${PATH}"
-CLAUDE_TOOLS="Read,Edit,Write,Glob,Grep,WebFetch,Bash(ebuild:*),Bash(emerge:*),Bash(pkgdev:*),Bash(pkgcheck:*),Bash(pycargoebuild:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(diff:*),Bash(tar:*),Bash(ls:*),Bash(find:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*)"
+CLAUDE_TOOLS="Read,Edit,Write,Glob,Grep,WebFetch,Bash(ebuild:*),Bash(emerge:*),Bash(pkgdev:*),Bash(pkgcheck:*),Bash(pycargoebuild:*),Bash(python3:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(diff:*),Bash(tar:*),Bash(ls:*),Bash(find:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*)"
 
 setup() {
 	# A restored actions/cache belongs to the runner user, but portage and
@@ -65,7 +65,10 @@ install_claude() {
 
 claude_round() {
 	local round=$1
-	local args=(-p --max-turns "${CLAUDE_MAX_TURNS}" --permission-mode acceptEdits --allowedTools "${CLAUDE_TOOLS}")
+	# Claude only sees its working directories: add the unpacked sources and
+	# the distfiles, which the prompt points it to
+	local args=(-p --max-turns "${CLAUDE_MAX_TURNS}" --permission-mode acceptEdits --allowedTools "${CLAUDE_TOOLS}"
+		--add-dir /var/tmp/portage --add-dir /var/cache/distfiles)
 	((round > 1)) && args+=(--continue)
 	(cd "${OVERLAY}" && CLAUDE_CODE_OAUTH_TOKEN=${claude_token} claude "${args[@]}") \
 		> "${OUT}/claude-round-${round}.txt" 2>&1

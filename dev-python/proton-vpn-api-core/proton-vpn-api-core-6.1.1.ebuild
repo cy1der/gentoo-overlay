@@ -339,7 +339,7 @@ CRATES="
 	wasm-encoder@0.244.0
 	wasm-metadata@0.244.0
 	wasmparser@0.244.0
-	webpki-roots@1.0.7
+	webpki-roots@1.0.10
 	weedle2@5.0.0
 	winapi-util@0.1.11
 	windows-link@0.2.1

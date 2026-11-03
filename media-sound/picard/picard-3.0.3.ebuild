@@ -59,6 +59,7 @@ if [[ -n ${PATCHSET} ]]; then
 	PATCHES=( "${WORKDIR}/${PATCHSET}" )
 fi
 
+EPYTEST_PLUGINS=()
 distutils_enable_tests pytest
 
 python_prepare_all() {

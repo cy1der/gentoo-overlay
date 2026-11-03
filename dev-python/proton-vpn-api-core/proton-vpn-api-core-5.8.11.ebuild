@@ -506,9 +506,9 @@ src_compile() {
 python_test() {
 	# VPN connection cannot be tested within sandbox
 	local EPYTEST_IGNORE=(
-		tests/connection
-		tests/core/refresher
-		tests/core/test_{connection,settings}.py
+		tests/python/connection
+		tests/python/core/refresher
+		tests/python/core/test_{connection,settings}.py
 	)
 
 	XDG_RUNTIME_DIR="${T}/python_test" epytest

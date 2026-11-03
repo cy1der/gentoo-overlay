@@ -21,6 +21,10 @@ on:
         description: Retry versions that only have a needs-human issue (use with "only")
         type: boolean
         default: false
+      regenerate:
+        description: Redo a version that already has a PR, replacing its commits (needs "only")
+        type: boolean
+        default: false
 
 concurrency:
   group: autobump
@@ -53,13 +57,14 @@ jobs:
           ONLY: ${{ inputs.only }}
           FORCE_MODE: ${{ inputs.force_mode != 'config' && inputs.force_mode || '' }}
           RETRY: ${{ inputs.retry && '--retry' || '' }}
+          REGENERATE: ${{ inputs.regenerate && '--regenerate' || '' }}
         run: |
-          docker run --rm -e GITHUB_TOKEN -e GITHUB_REPOSITORY -e ONLY -e FORCE_MODE -e RETRY \
+          docker run --rm -e GITHUB_TOKEN -e GITHUB_REPOSITORY -e ONLY -e FORCE_MODE -e RETRY -e REGENERATE \
             -v "$PWD:/overlay" -w /overlay "$STAGE3" bash -c '
               python3 -m venv --system-site-packages /tmp/venv &&
               /tmp/venv/bin/pip install -q nvchecker &&
               /tmp/venv/bin/python .github/autobump/autobump.py check \
-                --only "$ONLY" --force-mode "$FORCE_MODE" $RETRY --output plan.json > /dev/null'
+                --only "$ONLY" --force-mode "$FORCE_MODE" $RETRY $REGENERATE --output plan.json > /dev/null'
 
       - id: plan
         run: |

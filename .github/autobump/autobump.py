@@ -179,6 +179,8 @@ def nvchecker_results(only):
 def cmd_check(args):
     from portage.versions import vercmp, ververify
 
+    if args.regenerate and not args.only:
+        sys.exit("--regenerate needs --only")
     config = tomllib.loads(CONFIG.read_text())
     plan = {"bump": [], "issue": []}
     open_prs = api("GET", f"/repos/{REPO}/pulls?state=open&per_page=100") or []
@@ -195,7 +197,7 @@ def cmd_check(args):
             mode = args.force_mode or entry.get("x_mode", "issue")
         if mode not in MODES:
             sys.exit(f"{cp}: unknown x_mode {mode!r}")
-        if already_handled(cp, new, check_issues=not args.retry):
+        if not args.regenerate and already_handled(cp, new, check_issues=not args.retry):
             log(f"{cp}: {new} already has a branch, PR or issue, skipping")
             continue
         item = {
@@ -215,7 +217,9 @@ def cmd_check(args):
         }
         for pr in open_prs:
             head_repo = (pr["head"]["repo"] or {}).get("full_name")  # None for deleted forks
-            if pr["head"]["ref"].startswith(f"autobump/{cp}-") and head_repo == REPO:
+            ref = pr["head"]["ref"]
+            # Regenerating starts over from main instead of this version's own PR
+            if ref.startswith(f"autobump/{cp}-") and ref != branch_name(cp, new) and head_repo == REPO:
                 item["base"] = pr["head"]["ref"]
                 item["base_pr"] = pr["number"]
                 item["base_ai"] = any(label["name"] == "ai-assisted" for label in pr["labels"])
@@ -400,13 +404,18 @@ def push_commits(branch, commits):
     The commits are made through the API rather than pushed, so GitHub signs
     them as the App and they show as Verified. The patches are also applied
     to a local checkout to work out which files each commit changes.
+
+    An existing branch (a regenerated PR) is only moved once the commits are
+    made on a staging branch: GitHub closes a PR whose head is reset to main.
     """
     head = run("git", "rev-parse", "origin/main", capture=True).strip()
-    ref = f"/repos/{REPO}/git/refs/heads/{q(branch)}"
+    target = f"/repos/{REPO}/git/refs/heads/{q(branch)}"
+    work = f"autobump-staging/{branch}" if api("GET", target) else branch
+    ref = f"/repos/{REPO}/git/refs/heads/{q(work)}"
     if api("GET", ref):
         api("PATCH", ref, {"sha": head, "force": True})
     else:
-        api("POST", f"/repos/{REPO}/git/refs", {"ref": f"refs/heads/{branch}", "sha": head})
+        api("POST", f"/repos/{REPO}/git/refs", {"ref": f"refs/heads/{work}", "sha": head})
     run("git", "checkout", "-q", "-B", branch, "origin/main")
 
     for patch, message in commits:
@@ -425,7 +434,7 @@ def push_commits(branch, commits):
             CREATE_COMMIT,
             {
                 "input": {
-                    "branch": {"repositoryNameWithOwner": REPO, "branchName": branch},
+                    "branch": {"repositoryNameWithOwner": REPO, "branchName": work},
                     "expectedHeadOid": head,
                     "message": {"headline": headline, "body": body},
                     "fileChanges": {"additions": additions, "deletions": deletions},
@@ -434,6 +443,57 @@ def push_commits(branch, commits):
         )
         head = data["createCommitOnBranch"]["commit"]["oid"]
         run("git", "commit", "-q", "-m", message)
+
+    if work != branch:
+        api("PATCH", target, {"sha": head, "force": True})
+        api("DELETE", ref)
+
+
+def open_pr(cp, new, branch, body, ai, draft):
+    pr = api(
+        "POST",
+        f"/repos/{REPO}/pulls",
+        {
+            "title": f"chore({cp}): version {new}",
+            "head": branch,
+            "base": "main",
+            "body": body,
+            "draft": draft,
+        },
+    )
+    labels = ["autobump"] + (["ai-assisted"] if ai else [])
+    api("POST", f"/repos/{REPO}/issues/{pr['number']}/labels", {"labels": labels})
+    api("POST", f"/repos/{REPO}/issues/{pr['number']}/assignees", {"assignees": [MAINTAINER]})
+    try:
+        api("POST", f"/repos/{REPO}/pulls/{pr['number']}/requested_reviewers", {"reviewers": [MAINTAINER]})
+    except RuntimeError as e:  # the PR is still useful without the request
+        log(f"{cp}: could not request a review: {e}")
+    log(f"{cp}: opened PR {pr['html_url']}")
+    return pr
+
+
+SET_DRAFT = """
+mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { clientMutationId } }
+"""
+SET_READY = """
+mutation($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { clientMutationId } }
+"""
+
+
+def update_pr(cp, pr, body, ai, draft):
+    """Bring a regenerated PR's description, draft state and labels up to date."""
+    number = pr["number"]
+    api("PATCH", f"/repos/{REPO}/pulls/{number}", {"body": body})
+    if pr["draft"] != draft:
+        graphql(SET_DRAFT if draft else SET_READY, {"id": pr["node_id"]})
+    api("POST", f"/repos/{REPO}/issues/{number}/labels", {"labels": ["autobump"] + (["ai-assisted"] if ai else [])})
+    if not ai and any(label["name"] == "ai-assisted" for label in pr["labels"]):
+        api("DELETE", f"/repos/{REPO}/issues/{number}/labels/ai-assisted")
+    run_id = os.environ.get("GITHUB_RUN_ID")
+    run_link = f" in [this run]({os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{REPO}/actions/runs/{run_id})" if run_id else ""
+    api("POST", f"/repos/{REPO}/issues/{number}/comments", {"body": f"Regenerated from `main`{run_link}, replacing the previous commits."})
+    log(f"{cp}: regenerated PR {pr['html_url']}")
+    return pr
 
 
 def publish_result(result_dir, item):
@@ -445,7 +505,21 @@ def publish_result(result_dir, item):
     ai_summary = (result_dir / "ai-summary.md").read_text() if (result_dir / "ai-summary.md").exists() else ""
     pkgcheck = tail(result_dir / "pkgcheck.txt", 40)
     build = tail(result_dir / "build.log", 60)
+    branch = branch_name(cp, new)
+    owner = REPO.split("/")[0]
+    # Only there when regenerating
+    existing = (api("GET", f"/repos/{REPO}/pulls?state=open&head={q(owner + ':' + branch)}") or [None])[0]
 
+    if status == "failed" and existing:
+        body = (
+            "Regenerating failed, the PR is unchanged.\n\n"
+            + (f"## Claude's notes\n\n{ai_summary}\n\n" if ai_summary else "")
+            + details("pkgcheck", pkgcheck)
+            + details("Build log (tail)", build)
+        )
+        api("POST", f"/repos/{REPO}/issues/{existing['number']}/comments", {"body": body})
+        log(f"{cp}: regenerating #{existing['number']} failed")
+        return
     if status == "failed":
         body = (
             f"{headline(cp, old, new, res['url'])}.\n\n"
@@ -459,7 +533,6 @@ def publish_result(result_dir, item):
         open_issue(res, body, ["autobump", "needs-human"])
         return
 
-    branch = branch_name(cp, new)
     message = f"chore({cp}): version {new}"
     if ai:
         message += f"\n\n{CLAUDE_TRAILER}"
@@ -478,25 +551,10 @@ def publish_result(result_dir, item):
         + details("Build log (tail)", build)
         + small("Comment `@claude <instructions>` to have Claude make changes.")
     )
-    pr = api(
-        "POST",
-        f"/repos/{REPO}/pulls",
-        {
-            "title": f"chore({cp}): version {new}",
-            "head": branch,
-            "base": "main",
-            "body": body,
-            "draft": status == "ai",
-        },
-    )
-    labels = ["autobump"] + (["ai-assisted"] if ai else [])
-    api("POST", f"/repos/{REPO}/issues/{pr['number']}/labels", {"labels": labels})
-    api("POST", f"/repos/{REPO}/issues/{pr['number']}/assignees", {"assignees": [MAINTAINER]})
-    try:
-        api("POST", f"/repos/{REPO}/pulls/{pr['number']}/requested_reviewers", {"reviewers": [MAINTAINER]})
-    except RuntimeError as e:  # the PR is still useful without the request
-        log(f"{cp}: could not request a review: {e}")
-    log(f"{cp}: opened PR {pr['html_url']}")
+    if existing:
+        pr = update_pr(cp, existing, body, ai, draft=status == "ai")
+    else:
+        pr = open_pr(cp, new, branch, body, ai, draft=status == "ai")
     for issue in find_issues(cp, new, "open"):
         api("POST", f"/repos/{REPO}/issues/{issue['number']}/comments", {"body": f"Retried in #{pr['number']}."})
         api("PATCH", f"/repos/{REPO}/issues/{issue['number']}", {"state": "closed", "state_reason": "completed"})
@@ -549,6 +607,7 @@ def main():
     p.add_argument("--force-mode", choices=MODES + ("",), help="override x_mode")
     p.add_argument("--output", help="also write the plan to this file")
     p.add_argument("--retry", action="store_true", help="retry versions that only have an issue")
+    p.add_argument("--regenerate", action="store_true", help="redo versions that already have a PR (needs --only)")
     p.set_defaults(func=cmd_check)
 
     p = sub.add_parser("bump")

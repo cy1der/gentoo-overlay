@@ -89,6 +89,14 @@ Gentoo versions become issues.
 - **Retrying** a `needs-human` issue (e.g. after fixing the workflow): run it
   with `only` set to the package and `retry` ticked. A PR closes the issue;
   another failure is added to it as a comment.
+- **Regenerating** a PR (e.g. after changing the workflow, the prompt, or the
+  previous ebuild on `main`): run it with `only` set to the package and
+  `regenerate` ticked. The version is bumped again from `main` and the open
+  PR's branch is replaced with the new commits, discarding anything pushed to
+  it since (by `@claude` or by hand). Its description, draft state and
+  `ai-assisted` label are updated to match. If it fails, the failure is
+  commented on the PR and the PR is left as it was. A version whose PR was
+  closed gets a new PR.
 - **Locally**, to see what's outdated: `pip install nvchecker`, then
   `GITHUB_TOKEN=$(gh auth token) python3 .github/autobump/autobump.py check`.
 

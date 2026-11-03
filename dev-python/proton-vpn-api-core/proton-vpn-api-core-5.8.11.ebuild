@@ -462,11 +462,11 @@ RDEPEND="
 "
 BDEPEND="
 	virtual/pkgconfig
-	test? ( dev-python/pytest-asyncio[${PYTHON_USEDEP}] )
 "
 
 QA_FLAGS_IGNORED="usr/lib/python3.*/site-packages/proton/vpn/platform.abi3.so"
 
+EPYTEST_PLUGINS=( pytest-asyncio )
 distutils_enable_sphinx docs
 distutils_enable_tests pytest
 

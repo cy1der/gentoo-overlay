@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<upstream>
+		<remote-id type="github">horizon-rust/horizon</remote-id>
+		<bugs-to>https://github.com/horizon-rust/horizon/issues</bugs-to>
+		<changelog>https://github.com/horizon-rust/horizon/releases?q=launcher</changelog>
+		<doc>https://playhorizon.dev/docs/</doc>
+	</upstream>
+	<longdescription>
+		The launcher for Horizon, an unofficial rewrite of Minecraft: Java
+		Edition in Rust. It signs in to a Microsoft account that owns the game,
+		installs and updates Horizon builds, prepares their resources from the
+		player's own copy of Minecraft, and manages instances, mods, modpacks
+		and servers. No Minecraft code or assets are included.
+	</longdescription>
+</pkgmetadata>

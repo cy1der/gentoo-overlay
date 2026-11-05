@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<upstream>
+		<remote-id type="github">mautrix/manager</remote-id>
+		<bugs-to>https://github.com/mautrix/manager/issues</bugs-to>
+		<changelog>https://github.com/mautrix/manager/releases</changelog>
+	</upstream>
+	<longdescription>
+		Desktop app for logging into Matrix bridges built on the bridgev2
+		framework of mautrix-go, or any bridge implementing the same
+		provisioning API. Bridges can be added by URL or discovered from the
+		homeserver's /.well-known/matrix/mautrix file.
+	</longdescription>
+</pkgmetadata>

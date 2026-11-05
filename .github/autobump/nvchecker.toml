@@ -29,6 +29,13 @@ use_latest_release = true
 prefix = "v"
 x_mode = "pr"
 
+["net-im/mautrix-manager-bin"]
+source = "github"
+github = "mautrix/manager"
+use_latest_release = true
+prefix = "v"
+x_mode = "pr"
+
 ["dev-python/proton-core"]
 source = "github"
 github = "ProtonVPN/python-proton-core"

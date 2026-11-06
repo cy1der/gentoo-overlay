@@ -457,7 +457,7 @@ CRATES="
 	rustix@1.1.5
 	rustls-pki-types@1.15.1
 	rustls-webpki@0.103.16
-	rustls@0.23.45
+	rustls@0.23.46
 	rustversion@1.0.23
 	rustybuzz@0.20.1
 	ruzstd@0.9.1
@@ -504,6 +504,7 @@ CRATES="
 	smol_str@0.3.7
 	socket2@0.5.10
 	socket2@0.6.5
+	socks@0.3.4
 	spake2@0.4.0
 	spin@0.10.1
 	spin@0.9.9

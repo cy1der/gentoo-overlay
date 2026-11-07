@@ -6,7 +6,7 @@
 
 ```sh
 emerge --ask app-eselect/eselect-repository dev-vcs/git
-eselect repository add cy1der git https://github.com/cy1der/gentoo-overlay.git
+eselect repository enable cy1der
 emaint sync --repo cy1der
 ```
 

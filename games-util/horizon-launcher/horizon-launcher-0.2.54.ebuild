@@ -257,7 +257,7 @@ CRATES="
 	icu_segmenter_data@2.4.0
 	idna@1.1.0
 	idna_adapter@1.2.2
-	if-addrs@0.13.4
+	if-addrs@0.15.0
 	image-webp@0.2.4
 	image@0.25.10
 	imagesize@0.14.0
@@ -542,7 +542,7 @@ CRATES="
 	tiny-skia@0.11.4
 	tinystr@0.8.5
 	tinyvec@1.13.3
-	tokio@1.53.2
+	tokio@1.53.3
 	toml@0.8.23
 	toml@1.1.8+spec-1.1.0
 	toml_datetime@0.6.11
@@ -648,7 +648,6 @@ CRATES="
 	windows-strings@0.5.1
 	windows-sys@0.48.0
 	windows-sys@0.52.0
-	windows-sys@0.59.0
 	windows-sys@0.60.2
 	windows-sys@0.61.2
 	windows-targets@0.48.5

@@ -47,7 +47,8 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
    - a **PR** for a mechanical bump,
    - a **draft PR** labelled `ai-assisted` if Claude changed anything (the
      commit carries a `Co-Authored-By: Claude` trailer),
-   - an **issue** labelled `needs-human` if nothing worked, with the logs,
+   - an **issue** labelled `needs-human` if nothing worked, with the logs
+     (also when a bump job was cancelled or crashed before it had a result),
    - an **issue** for `x_mode = "issue"` packages.
 
    Every issue and PR is assigned to the repository owner, and PRs request
@@ -98,7 +99,8 @@ Gentoo versions become issues.
   be bumped.
 - **Retrying** a `needs-human` issue (e.g. after fixing the workflow): run it
   with `only` set to the package and `retry` ticked. A PR closes the issue;
-  another failure is added to it as a comment.
+  another failure is added to it as a comment. Cancelling a run also leaves
+  such issues for the bumps it interrupted, so retry those the same way.
 - **Regenerating** a PR (e.g. after changing the workflow, the prompt, or the
   previous ebuild on `main`): run it with `only` set to the package and
   `regenerate` ticked. The version is bumped again from `main` and the open

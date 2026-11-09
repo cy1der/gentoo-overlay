@@ -490,26 +490,40 @@ def update_pr(cp, pr, body, ai, draft):
     api("POST", f"/repos/{REPO}/issues/{number}/labels", {"labels": ["autobump"] + (["ai-assisted"] if ai else [])})
     if not ai and any(label["name"] == "ai-assisted" for label in pr["labels"]):
         api("DELETE", f"/repos/{REPO}/issues/{number}/labels/ai-assisted")
-    run_id = os.environ.get("GITHUB_RUN_ID")
-    run_link = f" in [this run]({os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{REPO}/actions/runs/{run_id})" if run_id else ""
+    url = run_url()
+    run_link = f" in [this run]({url})" if url else ""
     api("POST", f"/repos/{REPO}/issues/{number}/comments", {"body": f"Regenerated from `main`{run_link}, replacing the previous commits."})
     log(f"{cp}: regenerated PR {pr['html_url']}")
     return pr
 
 
+def run_url():
+    """This workflow run's page, when running in GitHub Actions."""
+    run_id = os.environ.get("GITHUB_RUN_ID")
+    return f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{REPO}/actions/runs/{run_id}" if run_id else ""
+
+
 def failure_note(res):
     """Why a failed bump failed, when that isn't in its logs."""
-    if res.get("reason") == "timeout":
+    reason = res.get("reason")
+    if reason == "timeout":
         return (
             f"It ran out of time and was stopped after {res.get('budget') or '?'} minutes, usually "
             "because a dependency takes too long to compile on a hosted runner. The build log shows "
             "what was compiling. Bump it by hand (the `skip-build` label skips the CI build on its PR).\n\n"
         )
+    if reason == "no-result":
+        url = run_url()
+        return (
+            "The bump job ended without a result: it was cancelled, hit the job's time limit, or the "
+            f"runner failed{f' (see [the run]({url}))' if url else ''}. Its logs are below if it "
+            "uploaded any. Once that's sorted out, run the workflow with `only` set to this package "
+            "and `retry` ticked.\n\n"
+        )
     return ""
 
 
-def publish_result(result_dir, item):
-    res = json.loads((result_dir / "result.json").read_text())
+def publish_result(result_dir, item, res):
     cp, old, new, status = res["atom"], res["old"], res["new"], res["status"]
     # Changes carried over from an ai-assisted PR still need a careful review
     ai = status == "ai" or (status != "failed" and item.get("base_ai", False))
@@ -591,19 +605,31 @@ def cmd_publish(args):
         except Exception as e:  # keep going so one failure doesn't hide the rest
             log(f"{item['atom']}: {e}")
             failures += 1
+    bumps = plan.get("bump", [])
+    root = Path(args.results or "results")
     # download-artifact nests each artifact in its own directory only when
     # there is more than one, so look at any depth
-    results = sorted(Path(args.results).rglob("result.json")) if args.results else []
-    if len(results) < len(plan.get("bump", [])):
-        log(f"expected {len(plan['bump'])} bump result(s), found {len(results)}")
-        failures += len(plan["bump"]) - len(results)
-    items = {(i["atom"], i["new"]): i for i in plan.get("bump", [])}
-    for result in results:
+    found = {}
+    for path in sorted(root.rglob("result.json")) if root.is_dir() else []:
         try:
-            res = json.loads(result.read_text())
-            publish_result(result.parent, items.get((res["atom"], res["new"]), {}))
+            res = json.loads(path.read_text())
+            found[(res["atom"], res["new"])] = (path.parent, res)
         except Exception as e:
-            log(f"{result.parent.name}: {e}")
+            log(f"{path}: {e}")
+    for item in bumps:
+        result_dir, res = found.get((item["atom"], item["new"]), (None, None))
+        if res is None:
+            # Cancelled or crashed. Record it anyway, or the next run tries again.
+            log(f"{item['atom']}: no result for {item['new']}")
+            failures += 1
+            nested = root / f"result-{item['key']}"
+            result_dir = nested if nested.is_dir() or len(bumps) > 1 else root
+            res = {key: item[key] for key in ("atom", "old", "new", "mode", "url")}
+            res |= {"status": "failed", "reason": "no-result"}
+        try:
+            publish_result(result_dir, item, res)
+        except Exception as e:
+            log(f"{item['atom']}: {e}")
             failures += 1
     if failures:
         sys.exit(f"{failures} item(s) failed to publish")

@@ -3,6 +3,20 @@
 
 EAPI=8
 
+CRATES="
+	block-buffer@0.10.4
+	cfg-if@1.0.5
+	cpufeatures@0.2.17
+	crypto-common@0.1.7
+	digest@0.10.7
+	generic-array@0.14.7
+	iced-x86@1.21.0
+	lazy_static@1.5.1
+	libc@0.2.191
+	sha2@0.10.9
+	typenum@1.20.1
+	version_check@0.9.5
+"
 DOTNET_PKG_COMPAT="8.0"
 NUGETS="
 	avalonia@11.2.3
@@ -22,6 +36,12 @@ NUGETS="
 	harfbuzzsharp.nativeassets.webassembly@7.3.0.3
 	harfbuzzsharp.nativeassets.win32@7.3.0.3
 	microcom.runtime@0.11.0
+	microsoft.aspnetcore.app.runtime.linux-x64@8.0.33
+	microsoft.dotnet.ilcompiler@8.0.33
+	microsoft.net.illink.tasks@8.0.33
+	microsoft.netcore.app.host.linux-x64@8.0.33
+	microsoft.netcore.app.runtime.linux-x64@8.0.33
+	runtime.linux-x64.microsoft.dotnet.ilcompiler@8.0.33
 	skiasharp@2.88.9
 	skiasharp.nativeassets.linux@2.88.9
 	skiasharp.nativeassets.macos@2.88.9
@@ -33,7 +53,7 @@ NUGETS="
 "
 PYTHON_COMPAT=( python3_{11..15} )
 
-inherit cmake desktop dotnet-pkg-base edo flag-o-matic python-single-r1 toolchain-funcs xdg
+inherit cargo cmake desktop dotnet-pkg-base edo flag-o-matic python-single-r1 toolchain-funcs xdg
 
 DESCRIPTION="Runs your own Bloodborne dump natively, with its graphics on Vulkan"
 HOMEPAGE="https://github.com/Awakenchan/LanternEngine"
@@ -41,12 +61,15 @@ SRC_URI="
 	https://github.com/Awakenchan/LanternEngine/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz
 	https://github.com/Awakenchan/LanternEngine/releases/download/v${PV}/LanternEngine-v${PV}-linux-x64.tar.gz
 		-> ${P}-linux-x64.tar.gz
+	${CARGO_CRATE_URIS}
 	gui? ( ${NUGET_URIS} )
 "
 S="${WORKDIR}/LanternEngine-${PV}"
 CMAKE_USE_DIR="${S}/engine/gpu"
 
 LICENSE="GPL-3+ dlss? ( NVIDIA-RTX-SDK )"
+# Dependent crate licenses
+LICENSE+=" Apache-2.0 MIT"
 SLOT="0"
 # The game's own x86-64 code runs directly on the CPU
 KEYWORDS="-* ~amd64"
@@ -74,6 +97,7 @@ DEPEND="
 	>=dev-util/vulkan-headers-1.4.357
 	dev-util/vulkan-memory-allocator
 	media-libs/libatrac9
+	media-libs/opus
 	>=media-libs/libsdl3-3.4
 	media-libs/vulkan-loader
 	>=media-video/ffmpeg-7.1:=
@@ -91,6 +115,7 @@ RDEPEND="
 	dev-libs/xxhash
 	dev-libs/zydis:=
 	media-libs/libatrac9
+	media-libs/opus
 	>=media-libs/libsdl3-3.4
 	media-libs/vulkan-loader
 	>=media-video/ffmpeg-7.1:=
@@ -120,7 +145,7 @@ PATCHES=(
 	"${FILESDIR}"/${PN}-0.9.37-build-fixes.patch
 	"${FILESDIR}"/${PN}-0.9.37-no-self-update.patch
 	"${FILESDIR}"/${PN}-0.9.37-steam-shortcut.patch
-	"${FILESDIR}"/${PN}-0.9.37-system-libs.patch
+	"${FILESDIR}"/${PN}-0.9.40-system-libs.patch
 )
 
 QA_PREBUILT="
@@ -130,6 +155,7 @@ QA_PREBUILT="
 
 pkg_setup() {
 	python-single-r1_pkg_setup
+	rust_pkg_setup
 	use gui && dotnet-pkg-base_setup
 }
 
@@ -145,6 +171,9 @@ src_unpack() {
 		engine/fsr4_shaders
 		engine/gamecontrollerdb.txt
 		engine/shader-catalog
+		engine/lamp2lamp.bin
+		engine/lamp2lamp-bosses.bin
+		engine/debug-font
 	)
 	use dlss && release+=(
 		engine/out/LICENSE-DLSS-SDK.txt
@@ -152,6 +181,10 @@ src_unpack() {
 	)
 	tar -xzf "${DISTDIR}"/${P}-linux-x64.tar.gz -C "${WORKDIR}"/release --strip-components=1 \
 		--wildcards "${release[@]/#/LanternEngine/}" || die
+
+	mkdir -p "${ECARGO_VENDOR}" || die
+	cargo_crate_unpack
+	cargo_gen_config
 
 	if use gui; then
 		nuget_link-system-nugets
@@ -187,6 +220,7 @@ src_configure() {
 		-DCMAKE_INSTALL_RPATH="${EPREFIX}"/usr/$(get_libdir)/${PN}/engine/out/gpu
 	)
 	cmake_src_configure
+	cargo_src_configure --manifest-path="${S}"/engine/tools/isa-scan/Cargo.toml
 
 	if use gui; then
 		dotnet-pkg-base_restore launcher/windows/LanternLauncher/LanternLauncher.csproj
@@ -206,7 +240,10 @@ gpu_cache_sources() {
 }
 
 src_compile() {
-	cmake_src_compile bbgpu bb-engine-assets bb-shader-lab
+	cmake_src_compile bbgpu bb-engine-assets bb-ui-4k bb-shader-lab
+
+	# The MOVBE/BMI1/LZCNT scanner
+	cargo_src_compile
 
 	pushd engine >/dev/null || die
 	local pkgs=( vulkan sdl3 ) cflags libs
@@ -216,7 +253,9 @@ src_compile() {
 
 	# The same programs and options as engine/build.sh. bb-probe stays non-PIE: the game's
 	# memory layout depends on it.
-	edo $(tc-getCC) "${cflags[@]}" -I. -Isrc src/probe.c src/runtime*.c src/vulkan_smoke.c \
+	edo $(tc-getCC) "${cflags[@]}" -mgeneral-regs-only -I. -Isrc -c src/isa_emulate.c -o "${T}"/isa_emulate.o
+	edo $(tc-getCC) "${cflags[@]}" -I. -Isrc src/probe.c src/isa_rewrite.c "${T}"/isa_emulate.o \
+		src/host.c src/wait_stats.c src/blocked.c src/sys/*.c src/vulkan_smoke.c \
 		${LDFLAGS} -latrac9 -lm -L"${BUILD_DIR}" -lbbgpu \
 		-Wl,-rpath,"${EPREFIX}"/usr/$(get_libdir)/${PN}/engine/out/gpu -rdynamic \
 		"${libs[@]}" -no-pie -o "${T}"/bb-probe
@@ -252,7 +291,7 @@ src_install() {
 
 	insinto ${dist}/engine
 	doins -r engine/{data,licenses,patches,scripts} \
-		"${WORKDIR}"/release/engine/{fsr4_shaders,gamecontrollerdb.txt,shader-catalog}
+		"${WORKDIR}"/release/engine/{fsr4_shaders,gamecontrollerdb.txt,shader-catalog,lamp2lamp.bin,lamp2lamp-bosses.bin,debug-font}
 	newins "${WORKDIR}"/release/lantern.ini lantern.default.ini
 	exeinto ${dist}/engine
 	doexe engine/run.sh
@@ -261,7 +300,8 @@ src_install() {
 
 	exeinto ${dist}/engine/out
 	doexe "${T}"/{bb-probe,bb-gpu-capabilities} engine/packaging/linux/bb-start \
-		"${BUILD_DIR}"/{bb-engine-assets,bb-shader-lab}
+		"${BUILD_DIR}"/{bb-engine-assets,bb-ui-4k,bb-shader-lab} \
+		"${S}"/engine/tools/isa-scan/target/release/bb-isa-scan
 	insinto ${dist}/engine/out
 	doins "${T}"/gpu-cache{,.legacy}.id
 	exeinto ${dist}/engine/out/gpu

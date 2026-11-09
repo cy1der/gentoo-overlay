@@ -8,7 +8,7 @@ The workflow already copied the newest ebuild to {{NEW}} and tried to
 regenerate the Manifest (and, unless noted below, to build it). Your job is to
 make `{{ATOM}}-{{NEW}}` pass
 `pkgcheck scan --exit error,warning,style -- ={{ATOM}}-{{NEW}}` and build with
-`emerge --oneshot ={{ATOM}}-{{NEW}}`.
+`/overlay/.github/autobump/gentoo.sh build ={{ATOM}}-{{NEW}}`.
 
 Read `CLAUDE.md` and `CONTRIBUTING.md` first and follow them.
 
@@ -29,8 +29,12 @@ How to approach it:
    `${PN}-{{NEW}}-<desc>.patch`. Refer to patches with a literal version
    (`"${FILESDIR}"/${PN}-1.2.3-desc.patch`), never `${P}` or `${PV}`.
 5. Regenerate the Manifest with `pkgdev manifest` from the package directory.
-6. Build with `emerge --oneshot ={{ATOM}}-{{NEW}}` and iterate until it builds
-   and pkgcheck is clean.
+6. Build with `/overlay/.github/autobump/gentoo.sh build ={{ATOM}}-{{NEW}}` and
+   iterate until it builds and pkgcheck is clean. That is how the workflow
+   verifies it: it installs only the build-time dependencies (`DEPEND`,
+   `BDEPEND`, `IDEPEND`), then the package without its runtime-only ones. Don't
+   build with a plain `emerge`, which also builds every runtime dependency. If
+   the build needs something that is only in `RDEPEND`, add it to `BDEPEND`.
 
 Rules:
 - Only change files under `{{ATOM}}/`. Changes anywhere else are discarded.
@@ -47,6 +51,10 @@ Rules:
   `/etc/portage`, users). If the environment itself is broken, stop and say
   so in your summary. `emerge` already accepts `~amd64` dependencies from
   ::gentoo on its own; `package.mask`ed ones are a real problem to report.
+- The container uses the minimal stage3 profile, without `X` or `wayland`. If
+  a dependency can't be installed because of its `REQUIRED_USE`, that's the
+  container, not the ebuild: don't add USE dependencies the package doesn't
+  need (such as `net-libs/webkit-gtk[X]`). Report it in your summary instead.
 - This run is unattended: nobody approves commands, so a denied command stays
   denied. Find another way with the allowed tools, or report it.
 - You can read `/overlay`, `/var/tmp/portage` and `/var/cache/distfiles`. Put

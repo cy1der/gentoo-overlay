@@ -80,10 +80,10 @@ jobs:
         env:
           ATOMS: ${{ steps.changed.outputs.atoms }}
         run: |
+          # Build-time dependencies only, like autobump (see .github/autobump/gentoo.sh)
           for atom in $ATOMS; do
-            cp=$(docker exec gentoo python3 -c 'import sys; from portage.versions import cpv_getkey; print(cpv_getkey(sys.argv[1][1:]))' "$atom")
-            echo "::group::emerge $atom"
-            docker exec gentoo emerge --oneshot --usepkg-exclude "$cp" --buildpkg-exclude "$cp" "$atom"
+            echo "::group::build $atom"
+            docker exec gentoo /overlay/.github/autobump/gentoo.sh build "$atom"
             echo "::endgroup::"
           done
 

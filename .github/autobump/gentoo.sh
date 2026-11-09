@@ -3,7 +3,8 @@
 # see .github/autobump/README.md.
 #
 #   gentoo.sh setup                           sync ::gentoo and install the tools
-#   gentoo.sh verify <cat/pn> <ver> <log>     pkgcheck + emerge one version
+#   gentoo.sh build =<cat/pn>-<ver>           build one version (build-time deps only)
+#   gentoo.sh verify <cat/pn> <ver> <log>     pkgcheck + build one version
 #   gentoo.sh job <cat/pn> <old> <new> <mode> <drop_old> <url>
 #                                             bump one package, results go to .autobump-out/
 set -euo pipefail
@@ -14,7 +15,7 @@ AUTOBUMP=(python3 "${OVERLAY}/.github/autobump/autobump.py")
 CLAUDE_ROUNDS=${CLAUDE_ROUNDS:-3}
 CLAUDE_MAX_TURNS=${CLAUDE_MAX_TURNS:-80}
 export PATH="${HOME}/.local/bin:${PATH}"
-CLAUDE_TOOLS="Read,Edit,Write,Glob,Grep,WebFetch,Bash(ebuild:*),Bash(emerge:*),Bash(pkgdev:*),Bash(pkgcheck:*),Bash(pycargoebuild:*),Bash(python3:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(diff:*),Bash(tar:*),Bash(ls:*),Bash(find:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*)"
+CLAUDE_TOOLS="Read,Edit,Write,Glob,Grep,WebFetch,Bash(${OVERLAY}/.github/autobump/gentoo.sh build:*),Bash(ebuild:*),Bash(emerge:*),Bash(pkgdev:*),Bash(pkgcheck:*),Bash(pycargoebuild:*),Bash(python3:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(diff:*),Bash(tar:*),Bash(ls:*),Bash(find:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*)"
 
 setup() {
 	# A restored actions/cache belongs to the runner user, but portage and
@@ -43,7 +44,21 @@ setup() {
 	git config --global --add safe.directory "${OVERLAY}"
 }
 
+# Builds one version with its default USE, installing only what building and
+# installing it needs (DEPEND, BDEPEND, IDEPEND). Its runtime-only dependencies
+# are left out: they're not needed to build it, and a GUI toolkit that is only
+# used at run time can take hours to compile.
 # Every command needs "|| return 1": set -e is off when called from an if.
+build() {
+	local atom=$1 cp
+	cp=$(python3 -c 'import sys; from portage.versions import cpv_getkey; print(cpv_getkey(sys.argv[1].lstrip("=")))' "${atom}") \
+		|| return 1
+	# Never reuse a binpkg of the package under test, always build it
+	local opts=(--oneshot --usepkg-exclude "${cp}" --buildpkg-exclude "${cp}")
+	emerge "${opts[@]}" --onlydeps --onlydeps-with-rdeps=n --onlydeps-with-ideps=y "${atom}" || return 1
+	emerge "${opts[@]}" --nodeps "${atom}" || return 1
+}
+
 verify() {
 	local cp=$1 ver=$2 log=$3
 	{
@@ -53,9 +68,8 @@ verify() {
 		(cd "${OVERLAY}" && pkgcheck scan --exit error,warning,style -- "=${cp}-${ver}") > "${OUT}/pkgcheck.txt" 2>&1 \
 			|| { cat "${OUT}/pkgcheck.txt"; return 1; }
 		cat "${OUT}/pkgcheck.txt"
-		echo ">>> emerge =${cp}-${ver}"
-		# Never reuse a binpkg of the package under test, always build it
-		emerge --oneshot --usepkg-exclude "${cp}" --buildpkg-exclude "${cp}" "=${cp}-${ver}" || return 1
+		echo ">>> build =${cp}-${ver}"
+		build "=${cp}-${ver}" || return 1
 	} > "${log}" 2>&1
 }
 

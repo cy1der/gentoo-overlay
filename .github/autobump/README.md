@@ -22,9 +22,15 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
    therefore stops that version from being proposed again.
 2. **bump** (per package, up to 4 in parallel, 6 h limit) copies the latest
    ebuild to the new version, runs `pkgdev manifest` and `pkgcheck scan --exit
-   error,warning,style` on the new version, and builds it with `emerge`. Dependencies come from Gentoo's official
-   binhost, and distfiles and binpkgs are cached between runs. Dependencies
-   that are only `~amd64` in ::gentoo are keyworded automatically
+   error,warning,style` on the new version, and builds it with `gentoo.sh
+   build`. That installs only what building it needs (`DEPEND`, `BDEPEND`,
+   `IDEPEND`), then builds the package itself with its default USE flags. Its
+   runtime-only dependencies are left out, so a GUI app doesn't compile a
+   toolkit it only uses at run time, and a build that needs something only
+   listed in `RDEPEND` fails, as it should (it belongs in `BDEPEND`).
+   Dependencies come from Gentoo's official binhost, and distfiles and binpkgs
+   are cached between runs. Dependencies that are only `~amd64` in ::gentoo
+   are keyworded automatically
    (`--autounmask-keep-keywords=n`), but `package.mask` is respected.
    - If that fails, or the package is `x_mode = "ai"`, Claude Code edits the
      new ebuild (deps, patches, `CRATES`, ...). The workflow re-runs pkgcheck
@@ -58,8 +64,8 @@ on it interactively (`.github/workflows/claude.yml`). That runs without
 portage, so the CI workflow on the PR does the build check.
 
 `.github/workflows/ci.yml` runs `pkgcheck scan --exit error,warning,style` on
-the changed packages and builds the changed ebuilds on every PR (`info`
-findings are shown but don't fail it). Add the `skip-build` label for packages too heavy for a hosted
+the changed packages and builds the changed ebuilds on every PR, the same way
+as bump does (`info` findings are shown but don't fail it). Add the `skip-build` label for packages too heavy for a hosted
 runner.
 
 ## Configuring packages

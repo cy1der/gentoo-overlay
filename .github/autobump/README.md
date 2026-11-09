@@ -34,8 +34,12 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
    (`--autounmask-keep-keywords=n`), but `package.mask` is respected.
    - If that fails, or the package is `x_mode = "ai"`, Claude Code edits the
      new ebuild (deps, patches, `CRATES`, ...). The workflow re-runs pkgcheck
-     and emerge after each round; Claude saying it's done isn't enough.
+     and emerge after each round; Claude saying it's done isn't enough. Each
+     round is stopped after `CLAUDE_ROUND_MINUTES` (60).
    - Only changes inside the package directory are kept.
+   - A bump gives up after `BUDGET_MINUTES` (320, set in the workflow), so
+     the job still saves its cache and uploads the result before the 6 h
+     limit. It becomes a `needs-human` issue saying it ran out of time.
 3. **publish** creates the commits through GitHub's API as the App bot, so
    GitHub signs them (Verified). They follow `CONTRIBUTING.md`
    (`chore(<cat>/<pn>): version <new>`, then `chore(<cat>/<pn>): drop <old>`
@@ -118,7 +122,7 @@ Gentoo versions become issues.
      `gh secret set AUTOBUMP_APP_KEY < key.pem`.
 2. **Claude:** run `claude setup-token` (needs a Pro or Max plan), then
    `gh secret set CLAUDE_CODE_OAUTH_TOKEN`. Usage counts against your plan's
-   limits. `CLAUDE_ROUNDS` and `CLAUDE_MAX_TURNS` in `gentoo.sh`, plus
+   limits. `CLAUDE_ROUNDS`, `CLAUDE_MAX_TURNS` and `CLAUDE_ROUND_MINUTES` in `gentoo.sh`, plus
    `max-parallel` in the workflow, keep it bounded. Without this secret, bumps
    that need Claude become `needs-human` issues.
 

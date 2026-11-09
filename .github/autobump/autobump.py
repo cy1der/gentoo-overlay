@@ -287,6 +287,7 @@ def cmd_prompt(args):
         "OLD": args.old,
         "NEW": args.new,
         "URL": args.url or "(none)",
+        "ROUND_MINUTES": str(args.round_minutes),
         "FAILURE": failure or "(not built yet)",
     }.items():
         text = text.replace("{{" + key + "}}", value)
@@ -496,6 +497,17 @@ def update_pr(cp, pr, body, ai, draft):
     return pr
 
 
+def failure_note(res):
+    """Why a failed bump failed, when that isn't in its logs."""
+    if res.get("reason") == "timeout":
+        return (
+            f"It ran out of time and was stopped after {res.get('budget') or '?'} minutes, usually "
+            "because a dependency takes too long to compile on a hosted runner. The build log shows "
+            "what was compiling. Bump it by hand (the `skip-build` label skips the CI build on its PR).\n\n"
+        )
+    return ""
+
+
 def publish_result(result_dir, item):
     res = json.loads((result_dir / "result.json").read_text())
     cp, old, new, status = res["atom"], res["old"], res["new"], res["status"]
@@ -513,6 +525,7 @@ def publish_result(result_dir, item):
     if status == "failed" and existing:
         body = (
             "Regenerating failed, the PR is unchanged.\n\n"
+            + failure_note(res)
             + (f"## Claude's notes\n\n{ai_summary}\n\n" if ai_summary else "")
             + details("pkgcheck", pkgcheck)
             + details("Build log (tail)", build)
@@ -524,6 +537,7 @@ def publish_result(result_dir, item):
         body = (
             f"{headline(cp, old, new, res['url'])}.\n\n"
             + "Autobump failed.\n\n"
+            + failure_note(res)
             + (f"## Claude's notes\n\n{ai_summary}\n\n" if ai_summary else "")
             + notes
             + details("pkgcheck", pkgcheck)
@@ -626,6 +640,7 @@ def main():
     p.add_argument("new")
     p.add_argument("--url")
     p.add_argument("--log", help="build log of the failed attempt")
+    p.add_argument("--round-minutes", type=int, default=60, help="time limit of each Claude round")
     p.set_defaults(func=cmd_prompt)
 
     p = sub.add_parser("publish")

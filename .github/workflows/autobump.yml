@@ -129,8 +129,11 @@ jobs:
           MODE: ${{ matrix.item.mode }}
           DROP_OLD: ${{ matrix.item.drop_old }}
           URL: ${{ matrix.item.url }}
+          # Gives up in time for the job (timeout-minutes) to still save the
+          # cache and upload the result, which publish turns into an issue
+          BUDGET_MINUTES: 320
         run: |
-          docker exec -e CLAUDE_CODE_OAUTH_TOKEN gentoo /overlay/.github/autobump/gentoo.sh \
+          docker exec -e CLAUDE_CODE_OAUTH_TOKEN -e BUDGET_MINUTES gentoo /overlay/.github/autobump/gentoo.sh \
             job "$ATOM" "$OLD" "$NEW" "$MODE" "$DROP_OLD" "$URL"
 
       - name: Make the cache readable

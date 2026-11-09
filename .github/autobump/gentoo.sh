@@ -12,10 +12,14 @@ set -euo pipefail
 OVERLAY=/overlay
 OUT=${OVERLAY}/.autobump-out
 AUTOBUMP=(python3 "${OVERLAY}/.github/autobump/autobump.py")
+SELF=${OVERLAY}/.github/autobump/gentoo.sh
 CLAUDE_ROUNDS=${CLAUDE_ROUNDS:-3}
 CLAUDE_MAX_TURNS=${CLAUDE_MAX_TURNS:-80}
+# Each Claude round is stopped after this long. The whole bump has
+# BUDGET_MINUTES (set by autobump.yml, no limit when unset).
+CLAUDE_ROUND_MINUTES=${CLAUDE_ROUND_MINUTES:-60}
 export PATH="${HOME}/.local/bin:${PATH}"
-CLAUDE_TOOLS="Read,Edit,Write,Glob,Grep,WebFetch,Bash(${OVERLAY}/.github/autobump/gentoo.sh build:*),Bash(ebuild:*),Bash(emerge:*),Bash(pkgdev:*),Bash(pkgcheck:*),Bash(pycargoebuild:*),Bash(python3:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(diff:*),Bash(tar:*),Bash(ls:*),Bash(find:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*)"
+CLAUDE_TOOLS="Read,Edit,Write,Glob,Grep,WebFetch,Bash(${SELF} build:*),Bash(ebuild:*),Bash(emerge:*),Bash(pkgdev:*),Bash(pkgcheck:*),Bash(pycargoebuild:*),Bash(python3:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(diff:*),Bash(tar:*),Bash(ls:*),Bash(find:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*)"
 
 setup() {
 	# A restored actions/cache belongs to the runner user, but portage and
@@ -59,6 +63,75 @@ build() {
 	emerge "${opts[@]}" --nodeps "${atom}" || return 1
 }
 
+# Runs a command for at most $1 seconds (0: no limit of its own) and never past
+# DEADLINE, if job() set one. Returns 124 when it ran out of time.
+limited() {
+	local limit=$1 rc=0
+	shift
+	if [[ -n ${DEADLINE:-} ]]; then
+		local left=$((DEADLINE - SECONDS))
+		((left > 0)) || return 124
+		if ((limit == 0 || left < limit)); then
+			limit=${left}
+		fi
+	fi
+	if ((limit == 0)); then
+		"$@" || rc=$?
+	else
+		timeout --kill-after=1m "${limit}" "$@" || rc=$?
+		# Killed when it ignored the TERM
+		((rc != 137)) || rc=124
+	fi
+	return "${rc}"
+}
+
+# Field $2 of /proc/$1/stat, counting from the one after "(comm)": 1 is the
+# state, 2 the parent PID. Nothing when the process is gone.
+proc_stat() {
+	local stat fields
+	read -r stat 2> /dev/null < "/proc/$1/stat" || return 0
+	# comm may contain spaces and parens
+	read -r -a fields <<< "${stat##*) }"
+	echo "${fields[$2 - 1]}"
+}
+
+# Stops every process in the container except PID 1 (`sleep infinity`) and
+# this script's own chain of parents. Only call it while nothing else of ours
+# runs. Builds that Claude started in the background, or one that timed out
+# and is still winding down, would otherwise compete with what comes next for
+# the CPU and portage's locks. Killing emerge alone isn't enough: the build
+# processes it started can outlive it.
+stop_strays() {
+	local -A keep=([1]=1)
+	local pid=${BASHPID} p i state strays=() alive
+	while ((pid > 1)); do
+		keep[${pid}]=1
+		pid=$(proc_stat "${pid}" 2)
+		pid=${pid:-0}
+	done
+	for p in /proc/[0-9]*; do
+		p=${p#/proc/}
+		[[ -z ${keep[${p}]:-} ]] || continue
+		# Zombies are done, nobody reaps them under `sleep infinity`
+		state=$(proc_stat "${p}" 1)
+		[[ -z ${state} || ${state} == Z ]] || strays+=("${p}")
+	done
+	((${#strays[@]})) || return 0
+	echo ">>> stopping ${#strays[@]} leftover processes"
+	kill -TERM "${strays[@]}" 2> /dev/null || true
+	for ((i = 0; i < 60; i++)); do
+		alive=()
+		for p in "${strays[@]}"; do
+			state=$(proc_stat "${p}" 1)
+			[[ -z ${state} || ${state} == Z ]] || alive+=("${p}")
+		done
+		((${#alive[@]})) || return 0
+		strays=("${alive[@]}")
+		sleep 1
+	done
+	kill -KILL "${strays[@]}" 2> /dev/null || true
+}
+
 verify() {
 	local cp=$1 ver=$2 log=$3
 	{
@@ -69,8 +142,27 @@ verify() {
 			|| { cat "${OUT}/pkgcheck.txt"; return 1; }
 		cat "${OUT}/pkgcheck.txt"
 		echo ">>> build =${cp}-${ver}"
-		build "=${cp}-${ver}" || return 1
+		local rc=0
+		limited 0 "${SELF}" build "=${cp}-${ver}" || rc=$?
+		if ((rc == 124)); then
+			echo ">>> stopped: out of time"
+			stop_strays
+		fi
+		return "${rc}"
 	} > "${log}" 2>&1
+}
+
+# verify, setting the caller's timed_out when it ran out of time. Past the
+# deadline it doesn't start, so build.log keeps the last attempt.
+try_verify() {
+	if [[ -n ${DEADLINE:-} ]] && ((SECONDS >= DEADLINE)); then
+		timed_out=true
+		return 124
+	fi
+	local rc=0
+	verify "$@" || rc=$?
+	((rc != 124)) || timed_out=true
+	return "${rc}"
 }
 
 install_claude() {
@@ -84,8 +176,11 @@ claude_round() {
 	local args=(-p --max-turns "${CLAUDE_MAX_TURNS}" --permission-mode acceptEdits --allowedTools "${CLAUDE_TOOLS}"
 		--add-dir /var/tmp/portage --add-dir /var/cache/distfiles)
 	((round > 1)) && args+=(--continue)
-	(cd "${OVERLAY}" && CLAUDE_CODE_OAUTH_TOKEN=${claude_token} claude "${args[@]}") \
-		> "${OUT}/claude-round-${round}.txt" 2>&1
+	local rc=0
+	(cd "${OVERLAY}" && CLAUDE_CODE_OAUTH_TOKEN=${claude_token} limited "$((CLAUDE_ROUND_MINUTES * 60))" claude "${args[@]}") \
+		> "${OUT}/claude-round-${round}.txt" 2>&1 || rc=$?
+	stop_strays
+	return "${rc}"
 }
 
 # Fingerprint of the package directory, to tell whether Claude changed anything
@@ -95,10 +190,14 @@ pkg_state() {
 
 job() {
 	local cp=$1 old=$2 new=$3 mode=$4 drop_old=$5 url=$6
-	local status=failed bumped=false round
+	local status=failed bumped=false round reason="" timed_out=false
 	# Only the claude process gets the token, our own builds don't see it
 	local claude_token=${CLAUDE_CODE_OAUTH_TOKEN:-}
 	unset CLAUDE_CODE_OAUTH_TOKEN
+	# Stop with time left to save the cache and upload the results
+	if [[ -n ${BUDGET_MINUTES:-} ]]; then
+		DEADLINE=$((SECONDS + BUDGET_MINUTES * 60))
+	fi
 
 	rm -rf "${OUT}"
 	mkdir -p "${OUT}"
@@ -110,27 +209,27 @@ job() {
 	if "${AUTOBUMP[@]}" bump "${cp}" "${new}" > "${OUT}/build.log" 2>&1; then
 		bumped=true
 		# ai-mode packages go straight to Claude, unless there is no token
-		if [[ ${mode} == pr || -z ${claude_token} ]] && verify "${cp}" "${new}" "${OUT}/build.log"; then
+		if [[ ${mode} == pr || -z ${claude_token} ]] && try_verify "${cp}" "${new}" "${OUT}/build.log"; then
 			status="pr"
 		fi
 	fi
 	echo ">>> mechanical bump: $([[ ${status} == pr ]] && echo built || echo "not built")"
 
-	if [[ ${status} == failed && -n ${claude_token} ]]; then
+	if [[ ${status} == failed && -n ${claude_token} && ${timed_out} == false ]]; then
 		install_claude
 		local prompt_args=(--url "${url}")
 		# Hand over the log only when something actually failed
 		if [[ ${mode} == pr || ${bumped} == false ]]; then
 			prompt_args+=(--log "${OUT}/build.log")
 		fi
-		local before claude_ok
+		local before rc
 		before=$(pkg_state "${cp}")
 		for ((round = 1; round <= CLAUDE_ROUNDS; round++)); do
 			echo ">>> Claude round ${round}"
-			claude_ok=true
+			rc=0
 			if ((round == 1)); then
-				"${AUTOBUMP[@]}" prompt "${cp}" "${old}" "${new}" "${prompt_args[@]}" | claude_round 1 \
-					|| claude_ok=false
+				"${AUTOBUMP[@]}" prompt "${cp}" "${old}" "${new}" --round-minutes "${CLAUDE_ROUND_MINUTES}" \
+					"${prompt_args[@]}" | claude_round 1 || rc=$?
 			else
 				{
 					echo "Verification failed again. Fix it and update .autobump-out/ai-summary.md."
@@ -138,9 +237,14 @@ job() {
 					echo '```'
 					tail -n 150 "${OUT}/build.log"
 					echo '```'
-				} | claude_round "${round}" || claude_ok=false
+				} | claude_round "${round}" || rc=$?
 			fi
-			if verify "${cp}" "${new}" "${OUT}/build.log"; then
+			case ${rc} in
+				0) ;;
+				124) echo ">>> Claude round ${round} ran out of time" ;;
+				*) echo ">>> Claude exited with an error, see claude-round-${round}.txt" ;;
+			esac
+			if try_verify "${cp}" "${new}" "${OUT}/build.log"; then
 				# Unchanged by Claude means it was a mechanical bump after all
 				if [[ $(pkg_state "${cp}") == "${before}" ]]; then
 					status="pr"
@@ -149,11 +253,15 @@ job() {
 				fi
 				break
 			fi
-			if [[ ${claude_ok} == false ]]; then
-				echo ">>> Claude exited with an error, see claude-round-${round}.txt"
+			# Another round won't do better after an error or a time limit
+			if ((rc != 0)) || [[ ${timed_out} == true ]]; then
 				break
 			fi
 		done
+	fi
+	if [[ ${timed_out} == true ]]; then
+		reason=timeout
+		echo ">>> out of time after ${BUDGET_MINUTES} minutes"
 	fi
 	echo ">>> result: ${status}"
 
@@ -171,8 +279,8 @@ job() {
 		fi
 	fi
 
-	python3 -c 'import json, sys; json.dump(dict(zip(("atom", "old", "new", "mode", "status", "url"), sys.argv[2:])), open(sys.argv[1], "w"))' \
-		"${OUT}/result.json" "${cp}" "${old}" "${new}" "${mode}" "${status}" "${url}"
+	python3 -c 'import json, sys; json.dump(dict(zip(("atom", "old", "new", "mode", "status", "url", "reason", "budget"), sys.argv[2:])), open(sys.argv[1], "w"))' \
+		"${OUT}/result.json" "${cp}" "${old}" "${new}" "${mode}" "${status}" "${url}" "${reason}" "${BUDGET_MINUTES:-}"
 }
 
 "$@"

@@ -37,6 +37,9 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
      and emerge after each round; Claude saying it's done isn't enough. Each
      round is stopped after `CLAUDE_ROUND_MINUTES` (60).
    - Only changes inside the package directory are kept.
+   - The bump step's log shows pkgcheck and the build as they run, and when
+     each Claude round has to stop. Claude's own output is in the result
+     artifact.
    - A bump gives up after `BUDGET_MINUTES` (320, set in the workflow), so
      the job still saves its cache and uploads the result before the 6 h
      limit. It becomes a `needs-human` issue saying it ran out of time.

@@ -95,15 +95,18 @@ proc_stat() {
 	echo "${fields[$2 - 1]}"
 }
 
-# Stops every process in the container except PID 1 (`sleep infinity`) and
-# this script's own chain of parents. Only call it while nothing else of ours
-# runs. Builds that Claude started in the background, or one that timed out
-# and is still winding down, would otherwise compete with what comes next for
-# the CPU and portage's locks. Killing emerge alone isn't enough: the build
-# processes it started can outlive it.
+# Stops every process in the container except PID 1 (`sleep infinity`), this
+# script's own chain of parents and the PIDs given. Only call it while nothing
+# else of ours runs. Builds that Claude started in the background, or one that
+# timed out and is still winding down, would otherwise compete with what comes
+# next for the CPU and portage's locks. Killing emerge alone isn't enough: the
+# build processes it started can outlive it.
 stop_strays() {
 	local -A keep=([1]=1)
 	local pid=${BASHPID} p i state strays=() alive
+	for p in "$@"; do
+		[[ -z ${p} ]] || keep[${p}]=1
+	done
 	while ((pid > 1)); do
 		keep[${pid}]=1
 		pid=$(proc_stat "${pid}" 2)
@@ -132,24 +135,37 @@ stop_strays() {
 	kill -KILL "${strays[@]}" 2> /dev/null || true
 }
 
+check_and_build() {
+	local cp=$1 ver=$2 keep=$3 rc=0
+	# Only the new version: the previous one may be dropped by this bump, and
+	# CI checks the whole package as it ends up
+	echo ">>> pkgcheck scan =${cp}-${ver}"
+	(cd "${OVERLAY}" && pkgcheck scan --exit error,warning,style -- "=${cp}-${ver}") > "${OUT}/pkgcheck.txt" 2>&1 \
+		|| { cat "${OUT}/pkgcheck.txt"; return 1; }
+	cat "${OUT}/pkgcheck.txt"
+	echo ">>> build =${cp}-${ver}"
+	limited 0 "${SELF}" build "=${cp}-${ver}" || rc=$?
+	if ((rc == 124)); then
+		echo ">>> stopped: out of time"
+		stop_strays "${keep}"
+	fi
+	return "${rc}"
+}
+
+# pkgcheck and build one version into $log, which is also followed in the step
+# log. Not with a pipe to tee: processes left over from a timed-out build
+# would keep that pipe, and with it verify, open.
 verify() {
-	local cp=$1 ver=$2 log=$3
-	{
-		# Only the new version: the previous one may be dropped by this bump, and
-		# CI checks the whole package as it ends up
-		echo ">>> pkgcheck scan =${cp}-${ver}"
-		(cd "${OVERLAY}" && pkgcheck scan --exit error,warning,style -- "=${cp}-${ver}") > "${OUT}/pkgcheck.txt" 2>&1 \
-			|| { cat "${OUT}/pkgcheck.txt"; return 1; }
-		cat "${OUT}/pkgcheck.txt"
-		echo ">>> build =${cp}-${ver}"
-		local rc=0
-		limited 0 "${SELF}" build "=${cp}-${ver}" || rc=$?
-		if ((rc == 124)); then
-			echo ">>> stopped: out of time"
-			stop_strays
-		fi
-		return "${rc}"
-	} > "${log}" 2>&1
+	local cp=$1 ver=$2 log=$3 rc=0 follow
+	: > "${log}"
+	tail -f -n +1 "${log}" &
+	follow=$!
+	check_and_build "${cp}" "${ver}" "${follow}" >> "${log}" 2>&1 || rc=$?
+	# Let tail catch up before stopping it
+	sleep 1
+	kill "${follow}" 2> /dev/null || true
+	wait "${follow}" 2> /dev/null || true
+	return "${rc}"
 }
 
 # verify, setting the caller's timed_out when it ran out of time. Past the
@@ -197,6 +213,7 @@ job() {
 	# Stop with time left to save the cache and upload the results
 	if [[ -n ${BUDGET_MINUTES:-} ]]; then
 		DEADLINE=$((SECONDS + BUDGET_MINUTES * 60))
+		echo ">>> time budget: ${BUDGET_MINUTES} minutes, until $(date -u -d "+${BUDGET_MINUTES} minutes" +%H:%M) UTC"
 	fi
 
 	rm -rf "${OUT}"
@@ -225,7 +242,11 @@ job() {
 		local before rc
 		before=$(pkg_state "${cp}")
 		for ((round = 1; round <= CLAUDE_ROUNDS; round++)); do
-			echo ">>> Claude round ${round}"
+			local stop=$((CLAUDE_ROUND_MINUTES * 60))
+			if [[ -n ${DEADLINE:-} ]] && ((DEADLINE - SECONDS < stop)); then
+				stop=$((DEADLINE - SECONDS))
+			fi
+			echo ">>> Claude round ${round}, stops by $(date -u -d "+${stop} seconds" +%H:%M) UTC"
 			rc=0
 			if ((round == 1)); then
 				"${AUTOBUMP[@]}" prompt "${cp}" "${old}" "${new}" --round-minutes "${CLAUDE_ROUND_MINUTES}" \

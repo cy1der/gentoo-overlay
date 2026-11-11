@@ -1,0 +1,22 @@
+The launcher is built framework-dependent and run on the system's .NET 8 runtime: don't
+pin the runtime to 8.0.33 (newer than ::gentoo's) and don't pull in the NativeAOT compiler.
+
+--- a/launcher/windows/LanternLauncher/LanternLauncher.csproj
++++ b/launcher/windows/LanternLauncher/LanternLauncher.csproj
+@@ -14,8 +14,6 @@
+     <StartupObject>BloodborneLauncher.Program</StartupObject>
+     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+     <Version>0.9.9</Version>
+-    <PublishAot>true</PublishAot>
+-    <RuntimeFrameworkVersion>8.0.33</RuntimeFrameworkVersion>
+     <IsAotCompatible>true</IsAotCompatible>
+     <InvariantGlobalization>false</InvariantGlobalization>
+     <OptimizationPreference>Speed</OptimizationPreference>
+@@ -31,7 +29,6 @@
+     <PackageReference Include="Avalonia.Desktop" Version="11.2.3" />
+     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.3" />
+     <PackageReference Include="System.Windows.Extensions" Version="8.0.0" />
+-    <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="8.0.33" />
+   </ItemGroup>
+ 
+   <ItemGroup>

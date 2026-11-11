@@ -36,12 +36,6 @@ NUGETS="
 	harfbuzzsharp.nativeassets.webassembly@7.3.0.3
 	harfbuzzsharp.nativeassets.win32@7.3.0.3
 	microcom.runtime@0.11.0
-	microsoft.aspnetcore.app.runtime.linux-x64@8.0.33
-	microsoft.dotnet.ilcompiler@8.0.33
-	microsoft.net.illink.tasks@8.0.33
-	microsoft.netcore.app.host.linux-x64@8.0.33
-	microsoft.netcore.app.runtime.linux-x64@8.0.33
-	runtime.linux-x64.microsoft.dotnet.ilcompiler@8.0.33
 	skiasharp@2.88.9
 	skiasharp.nativeassets.linux@2.88.9
 	skiasharp.nativeassets.macos@2.88.9
@@ -146,6 +140,7 @@ PATCHES=(
 	"${FILESDIR}"/${PN}-0.9.37-no-self-update.patch
 	"${FILESDIR}"/${PN}-0.9.37-steam-shortcut.patch
 	"${FILESDIR}"/${PN}-0.9.40-system-libs.patch
+	"${FILESDIR}"/${PN}-0.9.41-framework-dependent.patch
 )
 
 QA_PREBUILT="
@@ -320,7 +315,7 @@ src_install() {
 	dotnet_roots+=" ${EPREFIX}/opt/dotnet-sdk-bin-${DOTNET_PKG_COMPAT}"
 	sed -e "s|@DIST@|${EPREFIX}${dist}|" \
 		-e "s|@PYTHON@|${PYTHON}|" \
-		-e "s|@LAUNCHER@|${EPREFIX}/usr/share/${PN}/launcher/Lantern Engine|" \
+		-e "s|@LAUNCHER@|${EPREFIX}/usr/share/${PN}/launcher/LanternEngine|" \
 		-e "s|@LAUNCHER_SCRIPT@|${EPREFIX}/usr/bin/${PN}-launcher|" \
 		-e "s|@DOTNET_ROOTS@|${dotnet_roots}|" \
 		"${FILESDIR}"/${PN}-0.9.37-wrapper.sh > "${T}"/${PN} || die
@@ -328,6 +323,7 @@ src_install() {
 
 	if use gui; then
 		dotnet-pkg-base_install /usr/share/${PN}/launcher
+		[[ -x ${ED}/usr/share/${PN}/launcher/LanternEngine ]] || die "launcher binary not found"
 		dostrip -x /usr/share/${PN}/launcher
 		dosym ${PN} /usr/bin/${PN}-launcher
 

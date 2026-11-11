@@ -1,0 +1,218 @@
+--- a/cmake/web-ifc-config.cmake.in
++++ b/cmake/web-ifc-config.cmake.in
+@@ -1,5 +1,8 @@
+ @PACKAGE_INIT@
+ 
++include(CMakeFindDependencyMacro)
++find_dependency(glm)
++
+ include("${CMAKE_CURRENT_LIST_DIR}/web-ifc-targets.cmake")
+ 
+ check_required_components(web-ifc)
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,9 +1,6 @@
+ cmake_minimum_required(VERSION 3.28)
+ cmake_policy(SET CMP0054 NEW)
+ 
+-# set up cmake to download the external projects
+-include(FetchContent)
+-
+ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+ 	message("Building In Debug Mode")
+ 	set(RELEASE false)
+@@ -33,63 +30,57 @@
+ file(GLOB_RECURSE web-ifc-source web-ifc/*.cpp)
+ file(GLOB_RECURSE web-ifc-wasm wasm/*.cpp)
+ 
+-set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
+-
+-# download the external projects and save their paths
+-Message("Downloading FastFloat")
+-FetchContent_Declare(fastfloat GIT_REPOSITORY "https://github.com/fastfloat/fast_float" GIT_TAG "dbeabeeb3e6791cb96994c2a7a084c36e62ccfb2" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(fastfloat)
+-
+-Message("Downloading TinyNURBS")
+-FetchContent_Declare(tinynurbs GIT_REPOSITORY "https://github.com/QuimMoya/tinynurbs" GIT_TAG "47115cd9b6e922b27bbc4ab01fdeac2e9ea597a4" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(tinynurbs)
+-
+-Message("Downloading TinyCPPTest")
+-FetchContent_Declare(tinycpptest GIT_REPOSITORY "https://github.com/kovacsv/TinyCppTest" GIT_TAG "12e42c8ac6e032ce450fb3f772ebdfd1ddc6008c" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(tinycpptest)
+-
+-Message("Downloading GLM")
+-FetchContent_Declare(glm GIT_REPOSITORY "https://github.com/g-truc/glm" GIT_TAG "8d1fd52e5ab5590e2c81768ace50c72bae28f2ed" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(glm)
+-
+-Message("Downloading Earcut")
+-FetchContent_Declare(earcut GIT_REPOSITORY "https://github.com/mapbox/earcut.hpp" GIT_TAG "92acda9e2ed96ff1f910cda35de444727e9da7b0" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(earcut)
+-
+-Message("Downloading CDT")
+-FetchContent_Declare(cdt GIT_REPOSITORY "https://github.com/artem-ogre/CDT" GIT_TAG "b4413ee44affb489099ed4d6ec65e94788cb6708" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(cdt)
+-
+-Message("Downloading spdlog")
+-FetchContent_Declare(spdlog GIT_REPOSITORY "https://github.com/gabime/spdlog" GIT_TAG "79524ddd08a4ec981b7fea76afd08ee05f83755d" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(spdlog)
+-
+-Message("Downloading StdUUID")
+-FetchContent_Declare(stduuid GIT_REPOSITORY "https://github.com/mariusbancila/stduuid" GIT_TAG "3afe7193facd5d674de709fccc44d5055e144d7a" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(stduuid)
+-
+-Message("Downloading unordered_dense")
+-FetchContent_Declare(unordered_dense GIT_REPOSITORY "https://github.com/martinus/unordered_dense" GIT_TAG "7c58a8b7a48e790fe72f6508eb3b46317cbba9d5" SOURCE_SUBDIR "../")
+-FetchContent_MakeAvailable(unordered_dense)
++find_package(glm REQUIRED)
++find_package(spdlog REQUIRED)
++find_package(FastFloat CONFIG REQUIRED)
++
++set(tinynurbs_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinynurbs")
++set(earcut_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/earcut.hpp")
++set(cdt_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/CDT")
++set(stduuid_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/stduuid")
++set(unordered_dense_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/unordered_dense")
+ 
+-Message("Downloads Finished")
++if(BUILD_TESTING)
++	set(tinycpptest_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/TinyCppTest")
++endif()
+ 
+ function(PARAM_SETTER THE_EXECUTABLE)
+-	target_include_directories(${THE_EXECUTABLE} PUBLIC
+-		$<BUILD_INTERFACE:${glm_SOURCE_DIR}/>
+-		$<BUILD_INTERFACE:${glm_SOURCE_DIR}/glm>
+-	)
+-
+ 	target_include_directories(${THE_EXECUTABLE} PRIVATE
+ 		$<BUILD_INTERFACE:${tinynurbs_SOURCE_DIR}/include>
+-		$<BUILD_INTERFACE:${fastfloat_SOURCE_DIR}/include>
+ 		$<BUILD_INTERFACE:${cdt_SOURCE_DIR}/CDT/include>
+ 		$<BUILD_INTERFACE:${earcut_SOURCE_DIR}/include>
+-		$<BUILD_INTERFACE:${spdlog_SOURCE_DIR}/include>
+ 		$<BUILD_INTERFACE:${stduuid_SOURCE_DIR}/include>
+ 		$<BUILD_INTERFACE:${unordered_dense_SOURCE_DIR}/include>
+ 	)
+ 
++	foreach(dir IN ITEMS tinynurbs_SOURCE_DIR earcut_SOURCE_DIR cdt_SOURCE_DIR stduuid_SOURCE_DIR unordered_dense_SOURCE_DIR)
++		if(NOT EXISTS "${${dir}}")
++			message(FATAL_ERROR "Missing vendored dependency directory: ${dir}='${${dir}}'")
++		endif()
++	endforeach()
++
++	if(NOT TARGET glm::glm)
++		message(FATAL_ERROR "glm found but target glm::glm not provided")
++	endif()
++
++	target_link_libraries(${THE_EXECUTABLE} PUBLIC glm::glm)
++
++	if(TARGET spdlog::spdlog_header_only)
++		target_link_libraries(${THE_EXECUTABLE} PRIVATE spdlog::spdlog_header_only)
++	elseif(TARGET spdlog::spdlog)
++		target_link_libraries(${THE_EXECUTABLE} PRIVATE spdlog::spdlog)
++	else()
++		message(FATAL_ERROR "spdlog found but no known target (spdlog::spdlog_header_only / spdlog::spdlog)")
++	endif()
++
++	if(TARGET FastFloat::fast_float)
++		target_link_libraries(${THE_EXECUTABLE} PRIVATE FastFloat::fast_float)
++	elseif(TARGET fast_float::fast_float)
++		target_link_libraries(${THE_EXECUTABLE} PRIVATE fast_float::fast_float)
++	else()
++		message(FATAL_ERROR "FastFloat CMake package found, but no known target (FastFloat::fast_float / fast_float::fast_float)")
++	endif()
++
+ 	if(NOT MSVC)
+ 		target_compile_options(${THE_EXECUTABLE} PRIVATE -Wall -Wextra -Wpedantic)
+ 
+@@ -229,23 +220,25 @@
+ 		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/web-ifc>
+ 	)
+ 
+-	# build parameters for web-ifc-test
+-	add_executable(web-ifc-test ${web-ifc-source}
+-		"./test/main.cpp"
+-		"./test/io_helpers.cpp"
+-		"./test/encoding_test.cpp"
+-		"./test/get_schema_test.cpp"
+-		"./test/issue65_material_test.cpp"
+-		"./test/malformed_input_test.cpp"
+-		"./test/surface_curve_swept_area_test.cpp"
+-		"./test/touching_face_bounds_test.cpp"
+-	)
+-	param_setter(web-ifc-test)
+-	target_include_directories(web-ifc-test PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
+-	target_compile_definitions(web-ifc-test PRIVATE WEB_IFC_TEST_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../tests/functional/fixtures")
++	if(BUILD_TESTING)
++		# build parameters for web-ifc-test
++		add_executable(web-ifc-test ${web-ifc-source}
++			"./test/main.cpp"
++			"./test/io_helpers.cpp"
++			"./test/encoding_test.cpp"
++			"./test/get_schema_test.cpp"
++			"./test/issue65_material_test.cpp"
++			"./test/malformed_input_test.cpp"
++			"./test/surface_curve_swept_area_test.cpp"
++			"./test/touching_face_bounds_test.cpp"
++		)
++		param_setter(web-ifc-test)
++		target_include_directories(web-ifc-test PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
++		target_compile_definitions(web-ifc-test PRIVATE WEB_IFC_TEST_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../tests/functional/fixtures")
+ 
+-	add_test(web-ifc-test web-ifc-test)
+-	set_tests_properties(web-ifc-test PROPERTIES LABELS "web-ifc")
++		add_test(web-ifc-test web-ifc-test)
++		set_tests_properties(web-ifc-test PROPERTIES LABELS "web-ifc")
++	endif()
+ 
+ 	# brep kernel bench (native only), built only with the kernel: default builds are unchanged.
+ 	if(BREP_HAVE_KERNEL)
+@@ -267,13 +260,15 @@
+ 		endif()
+ 	endif()
+ 
+-	# build parameters for web-ifc in testing environment
+-	add_executable(web-ifc ${web-ifc-source} "./test/web-ifc-test.cpp" "./test/io_helpers.cpp")
+-	param_setter(web-ifc)
+-	target_include_directories(web-ifc PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
++	if(BUILD_TESTING)
++		# build parameters for web-ifc in testing environment
++		add_executable(web-ifc ${web-ifc-source} "./test/web-ifc-test.cpp" "./test/io_helpers.cpp")
++		param_setter(web-ifc)
++		target_include_directories(web-ifc PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
++	endif()
+ 
+ 	# comment these to prevent debug files being generated
+-	if(NOT RELEASE)
++	if(BUILD_TESTING AND NOT RELEASE)
+ 		target_compile_options(web-ifc PRIVATE -DCSG_DEBUG_OUTPUT -DDEBUG_DUMP_SVG)
+ 	endif()
+ 
+@@ -287,7 +282,7 @@
+ 	)
+ 
+ 	# Install web-ifc headers
+-	# boolean-utils/ is entirely internal (all headers only ever included from .cpp files)
++	# boolean-utils/ is not internal: representation/IfcGeometry.h includes boolean-utils/geometry.h
+ 	# mesh_utils.h and geometryutils.h are implementation-only helpers
+ 	# bim-geometry/utils.h and representation/ are part of the transitive public API
+ 	install(DIRECTORY web-ifc/
+@@ -296,7 +291,6 @@
+ 		PATTERN "*.h"
+ 		PATTERN "mesh_utils.h" EXCLUDE
+ 		PATTERN "geometryutils.h" EXCLUDE
+-		REGEX "boolean-utils" EXCLUDE
+ 	)
+ 
+ 	# Install version.h
+@@ -305,10 +299,6 @@
+ 	)
+ 
+ 	# Install bundled dependency headers (all header-only)
+-	install(DIRECTORY ${glm_SOURCE_DIR}/glm
+-		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+-	)
+-
+ 	install(DIRECTORY ${unordered_dense_SOURCE_DIR}/include/
+ 		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+ 	)

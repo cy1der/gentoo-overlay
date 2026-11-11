@@ -1,0 +1,37 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -209,6 +209,17 @@
+ 	add_library(web-ifc-library ${web-ifc-source})
+ 	param_setter(web-ifc-library)
+ 
++	# Opt-in: link the brep kernel into the native library as well (upstream only wires it into the wasm build).
++	if(BREP_ENGINE)
++		file(GLOB brep-library-source brep/*.cpp)
++		list(FILTER brep-library-source EXCLUDE REGEX ".*(bench_main|_test|mi_newdelete)\\.cpp$")
++		target_sources(web-ifc-library PRIVATE ${brep-library-source})
++		# JS never fuses multiply-adds; the kernel's exact predicates rely on that.
++		set_source_files_properties(${brep-library-source} TARGET_DIRECTORY web-ifc-library
++			PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
++		target_compile_definitions(web-ifc-library PUBLIC BREP_ENGINE BREP_HAVE_KERNEL)
++	endif()
++
+ 	# Export symbols on Windows (Needed for shared library)
+ 	set_target_properties(web-ifc-library PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+ 
+@@ -293,6 +304,16 @@
+ 		PATTERN "geometryutils.h" EXCLUDE
+ 	)
+ 
++	if(BREP_ENGINE)
++		install(DIRECTORY brep/
++			DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/web-ifc/brep
++			FILES_MATCHING
++			PATTERN "*.h"
++			PATTERN "sampler.h" EXCLUDE
++			PATTERN "gen" EXCLUDE
++		)
++	endif()
++
+ 	# Install version.h
+ 	install(FILES version.h
+ 		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/web-ifc

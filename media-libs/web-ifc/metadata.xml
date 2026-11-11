@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
 <pkgmetadata>
+	<use>
+		<flag name="brep">Build the brep geometry kernel (brep::ifc::BrepEngine) into the library and install its headers</flag>
+	</use>
 	<upstream>
 		<remote-id type="github">ThatOpen/engine_web-ifc</remote-id>
 	</upstream>

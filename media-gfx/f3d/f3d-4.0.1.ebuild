@@ -161,14 +161,6 @@ src_configure() {
 src_install() {
 	cmake_src_install
 
-	if use usd; then
-		# libf3d looks for the USD plugInfo.json in <libf3d dir>/../lib/usd,
-		# but it gets installed to <libdir>/lib/usd
-		mkdir -p "${ED}/usr/lib" || die
-		mv "${ED}/usr/$(get_libdir)/lib/usd" "${ED}/usr/lib/usd" || die
-		rmdir "${ED}/usr/$(get_libdir)/lib" || die
-	fi
-
 	if use python; then
 		local libdir=$(get_libdir)
 		if [[ "${libdir}" != "lib" && -d "${ED}/usr/${libdir}/${EPYTHON}" ]]; then

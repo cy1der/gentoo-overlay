@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# Hook Millennium into the current user's Steam client, or unhook it
+
+LIB=/usr/lib/millennium
+
+# client|link, relative to the Steam directory|link target
+LINKS=(
+	"steamrt64|steamrt64/libXtst.so.6|/run/host${LIB}/libmillennium_bootstrap_x64.so"
+	"ubuntu12_32|ubuntu12_32/libXtst.so.6|${LIB}/libmillennium_bootstrap_x86.so"
+	"ubuntu12_32|ubuntu12_64/libXtst.so.6|${LIB}/libmillennium_bootstrap_hhx64.so"
+	"ubuntu12_32|ubuntu12_64/libmillennium_hhx64.so|${LIB}/libmillennium_hhx64.so"
+)
+
+die() {
+	printf '%s: %s\n' "${0##*/}" "$*" >&2
+	exit 1
+}
+
+usage() {
+	cat <<-EOF
+	Usage: ${0##*/} [link|remove|status]
+
+	  link    create the links Steam loads Millennium through (default)
+	  remove  remove them
+	  status  show which Steam client runs and whether it is hooked
+
+	Run it as the user that runs Steam, then restart Steam.
+	EOF
+}
+
+find_steam() {
+	local d
+	for d in "${HOME}/.steam/steam" "${XDG_DATA_HOME:-${HOME}/.local/share}/Steam"; do
+		if [[ -d ${d}/steamrt64 || -d ${d}/ubuntu12_32 ]]; then
+			readlink -f -- "${d}"
+			return
+		fi
+	done
+	return 1
+}
+
+# Same choice steam.sh makes
+active_client() {
+	if [[ ! -e ${STEAM}/.steam-disable-steamrt64-client && -x ${STEAM}/steamrt64/steam ]]; then
+		echo steamrt64
+	else
+		echo ubuntu12_32
+	fi
+}
+
+# Whether this Millennium install has a bootstrap for a client
+supports() {
+	case ${1} in
+		steamrt64) [[ -e ${LIB}/libmillennium_bootstrap_x64.so ]] ;;
+		ubuntu12_32) [[ -e ${LIB}/libmillennium_bootstrap_x86.so ]] ;;
+	esac
+}
+
+describe() {
+	case ${1} in
+		steamrt64) echo "64-bit SteamRT3 client (steamrt64)" ;;
+		ubuntu12_32) echo "32-bit legacy client (ubuntu12_32)" ;;
+	esac
+}
+
+# Whether a path is a symlink into Millennium's library directory
+is_ours() {
+	local t
+	[[ -L ${1} ]] || return 1
+	t=$(readlink -- "${1}")
+	[[ ${t#/run/host} == "${LIB}"/* ]]
+}
+
+do_link() {
+	local entry client path target dst
+	for entry in "${LINKS[@]}"; do
+		IFS='|' read -r client path target <<<"${entry}"
+		dst=${STEAM}/${path}
+		if supports "${client}"; then
+			if [[ -e ${dst} || -L ${dst} ]] && ! is_ours "${dst}"; then
+				echo "skipped ${path}: exists and is not a Millennium link" >&2
+				continue
+			fi
+			mkdir -p -- "${dst%/*}" && ln -sfn -- "${target}" "${dst}" || exit
+			echo "linked  ${path} -> ${target}"
+		elif is_ours "${dst}"; then
+			rm -f -- "${dst}" || exit
+			echo "removed ${path} (no bootstrap installed for that client)"
+		fi
+	done
+}
+
+do_remove() {
+	local entry client path target
+	for entry in "${LINKS[@]}"; do
+		IFS='|' read -r client path target <<<"${entry}"
+		if is_ours "${STEAM}/${path}"; then
+			rm -f -- "${STEAM}/${path}" || exit
+			echo "removed ${path}"
+		fi
+	done
+	# Millennium turns this on to reach Steam's UI
+	if [[ -e ${STEAM}/.cef-enable-remote-debugging ]]; then
+		rm -f -- "${STEAM}/.cef-enable-remote-debugging" || exit
+		echo "removed .cef-enable-remote-debugging"
+	fi
+}
+
+do_status() {
+	local entry client path target dst state
+	echo "Steam directory: ${STEAM}"
+	echo "Steam runs:      $(describe "${ACTIVE}")"
+	echo
+	for entry in "${LINKS[@]}"; do
+		IFS='|' read -r client path target <<<"${entry}"
+		dst=${STEAM}/${path}
+		if is_ours "${dst}"; then
+			if [[ -e ${LIB}/${target##*/} ]]; then
+				state=ok
+			else
+				state=dangling
+			fi
+		elif [[ -e ${dst} || -L ${dst} ]]; then
+			state="not ours"
+		else
+			state=missing
+		fi
+		printf '  %-9s %-11s %s\n' "${state}" "${client}" "${path}"
+	done
+}
+
+hint() {
+	supports "${ACTIVE}" && return
+	echo
+	echo "This Millennium install has no bootstrap for the $(describe "${ACTIVE}")."
+	case ${ACTIVE} in
+		steamrt64) echo "Update Millennium, or switch Steam to the 32-bit client with: touch ${STEAM}/.steam-disable-steamrt64-client" ;;
+		ubuntu12_32) echo "Rebuild games-util/millennium-bin with USE=abi_x86_32" ;;
+	esac
+}
+
+case ${1:-link} in
+	link | remove | status) ;;
+	-h | --help | help) usage; exit 0 ;;
+	*) usage >&2; exit 1 ;;
+esac
+
+[[ ${EUID} -ne 0 ]] || die "run this as the user that runs Steam, not as root"
+STEAM=$(find_steam) || die "no Steam installation found in ~/.steam/steam or ~/.local/share/Steam"
+ACTIVE=$(active_client)
+
+case ${1:-link} in
+	link) do_link; hint ;;
+	remove) do_remove ;;
+	status) do_status; hint ;;
+esac
+
+if [[ ${1:-link} != status ]] && pgrep -u "${UID}" -x steam >/dev/null 2>&1; then
+	echo
+	echo "Steam is running; restart it for this to take effect."
+fi

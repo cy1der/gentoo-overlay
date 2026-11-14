@@ -12,6 +12,7 @@ CRATES="
 	accesskit_macos@0.26.3
 	accesskit_unix@0.22.1
 	accesskit_windows@0.34.0
+	addr2line@0.26.1
 	addr2line@0.27.1
 	adler2@2.0.1
 	aead@0.5.2
@@ -58,6 +59,7 @@ CRATES="
 	avif-serialize@0.8.9
 	backtrace@0.3.77
 	base64@0.22.1
+	beef@0.5.2
 	bit-set@0.10.0
 	bit-vec@0.9.1
 	bit_field@0.10.3
@@ -124,6 +126,7 @@ CRATES="
 	crunchy@0.2.4
 	crypto-common@0.1.7
 	ctor@1.0.13
+	cty@0.2.2
 	curve25519-dalek-derive@0.1.1
 	curve25519-dalek@4.1.3
 	data-url@0.3.2
@@ -160,6 +163,7 @@ CRATES="
 	event-listener-strategy@0.5.4
 	event-listener@5.4.2
 	exr@1.74.2
+	fallible-iterator@0.3.0
 	fastrand@2.5.0
 	fax@0.2.7
 	fdeflate@0.3.7
@@ -167,11 +171,14 @@ CRATES="
 	filedescriptor@0.8.3
 	filetime@0.2.29
 	find-msvc-tools@0.1.14
+	fixedbitset@0.5.9
 	flate2@1.1.10
 	float-cmp@0.9.0
 	float-ord@0.3.2
 	float_next_after@1.0.0
 	flume@0.12.0
+	fnv@1.0.7
+	foldhash@0.1.5
 	foldhash@0.2.0
 	font-types@0.11.3
 	font-types@0.12.6
@@ -181,6 +188,7 @@ CRATES="
 	foreign-types-shared@0.3.1
 	foreign-types@0.5.0
 	form_urlencoded@1.2.2
+	framehop@0.16.0
 	freetype-sys@0.20.1
 	futures-channel@0.3.34
 	futures-core@0.3.34
@@ -198,6 +206,7 @@ CRATES="
 	getrandom@0.3.4
 	getrandom@0.4.3
 	gif@0.14.2
+	gimli@0.33.0
 	gimli@0.34.0
 	gl_generator@0.14.0
 	glam@0.30.10
@@ -231,6 +240,7 @@ CRATES="
 	harfrust@0.5.2
 	hash32@0.3.1
 	hashbrown@0.14.5
+	hashbrown@0.15.5
 	hashbrown@0.16.1
 	hashbrown@0.17.1
 	heapless@0.9.3
@@ -287,6 +297,7 @@ CRATES="
 	libfuzzer-sys@0.4.13
 	libloading@0.8.9
 	libm@0.2.16
+	libmimalloc-sys@0.1.49
 	libredox@0.1.25
 	linebender_resource_handle@0.1.1
 	link-section@0.19.3
@@ -296,6 +307,12 @@ CRATES="
 	litrs@1.0.1
 	lock_api@0.4.14
 	log@0.4.34
+	logos-codegen@0.15.1
+	logos-codegen@0.16.1
+	logos-derive@0.15.1
+	logos-derive@0.16.1
+	logos@0.15.1
+	logos@0.16.1
 	loop9@0.1.5
 	lyon@1.0.19
 	lyon_algorithms@1.0.21
@@ -311,10 +328,14 @@ CRATES="
 	memchr@2.8.3
 	memmap2@0.9.11
 	memoffset@0.9.1
+	miette-derive@7.6.0
+	miette@7.6.0
+	mimalloc@0.1.52
 	minisign-verify@0.3.0
 	miniz_oxide@0.8.9
 	miniz_oxide@0.9.1
 	moxcms@0.8.1
+	multimap@0.10.1
 	multiversion_no_op@1.0.0
 	naga-types@30.0.1
 	naga@30.0.1
@@ -364,6 +385,7 @@ CRATES="
 	objc@0.2.7
 	objc_exception@0.1.2
 	objc_id@0.1.1
+	object@0.39.1
 	object@0.40.0
 	once_cell@1.21.4
 	once_cell_polyfill@1.70.2
@@ -382,6 +404,7 @@ CRATES="
 	pathfinder_simd@0.5.6
 	pbkdf2@0.12.2
 	percent-encoding@2.3.2
+	petgraph@0.8.3
 	phf@0.13.1
 	phf_generator@0.13.1
 	phf_macros@0.13.1
@@ -405,10 +428,18 @@ CRATES="
 	powerfmt@0.2.1
 	ppv-lite86@0.2.21
 	presser@0.3.1
+	prettyplease@0.2.37
 	proc-macro-crate@3.5.0
 	proc-macro2@1.0.107
 	profiling-procmacros@1.0.18
 	profiling@1.0.18
+	prost-build@0.14.4
+	prost-derive@0.14.4
+	prost-reflect@0.16.5
+	prost-types@0.14.4
+	prost@0.14.4
+	protox-parse@0.9.0
+	protox@0.9.1
 	pulldown-cmark@0.12.2
 	pulp-wasm-simd-flag@0.1.1
 	pulp@0.22.3
@@ -571,6 +602,7 @@ CRATES="
 	unicode-script@0.5.8
 	unicode-segmentation@1.13.3
 	unicode-vo@0.1.0
+	unicode-width@0.1.14
 	unicode-width@0.2.2
 	universal-hash@0.5.1
 	untrusted@0.9.0

@@ -59,6 +59,7 @@ CRATES="
 	avif-serialize@0.8.9
 	backtrace@0.3.77
 	base64@0.22.1
+	base64@0.23.1
 	beef@0.5.2
 	bit-set@0.10.0
 	bit-vec@0.9.1
@@ -86,6 +87,7 @@ CRATES="
 	cc@1.8.0
 	cfg-if@1.0.5
 	cfg_aliases@0.2.2
+	chacha20@0.10.2
 	chacha20@0.9.1
 	chacha20poly1305@0.10.1
 	chrono@0.4.45
@@ -119,6 +121,7 @@ CRATES="
 	core_maths@0.1.1
 	cosmic-text@0.19.0
 	cpufeatures@0.2.17
+	cpufeatures@0.3.1
 	crc32fast@1.5.2
 	crossbeam-deque@0.8.8
 	crossbeam-epoch@0.9.21
@@ -250,8 +253,14 @@ CRATES="
 	hex@0.4.3
 	hkdf@0.12.4
 	hmac@0.12.1
+	http-body-util@0.1.5
 	http-body@1.1.0
 	http@1.5.0
+	httparse@1.10.1
+	httpdate@1.0.3
+	hyper-rustls@0.27.10
+	hyper-util@0.1.21
+	hyper@1.12.0
 	iana-time-zone-haiku@0.1.2
 	iana-time-zone@0.1.65
 	icu_collections@2.4.0
@@ -277,6 +286,7 @@ CRATES="
 	interpolate_name@0.2.4
 	inventory@0.3.25
 	ipconfig@0.3.4
+	ipnet@2.12.2
 	is-docker@0.2.0
 	is-wsl@0.4.0
 	is_terminal_polyfill@1.70.2
@@ -314,6 +324,7 @@ CRATES="
 	logos@0.15.1
 	logos@0.16.1
 	loop9@0.1.5
+	lru-slab@0.1.3
 	lyon@1.0.19
 	lyon_algorithms@1.0.21
 	lyon_geom@1.0.19
@@ -334,6 +345,7 @@ CRATES="
 	minisign-verify@0.3.0
 	miniz_oxide@0.8.9
 	miniz_oxide@0.9.1
+	mio@1.2.4
 	moxcms@0.8.1
 	multimap@0.10.1
 	multiversion_no_op@1.0.0
@@ -447,15 +459,21 @@ CRATES="
 	qoi@0.4.1
 	quick-error@2.0.1
 	quick-xml@0.41.0
+	quinn-proto@0.11.19
+	quinn-udp@0.5.16
+	quinn@0.11.12
 	quote@1.0.47
 	r-efi@5.3.0
 	r-efi@6.0.0
+	rand@0.10.3
 	rand@0.8.8
 	rand@0.9.5
 	rand_chacha@0.3.1
 	rand_chacha@0.9.0
+	rand_core@0.10.1
 	rand_core@0.6.4
 	rand_core@0.9.5
+	rand_pcg@0.10.2
 	range-alloc@0.1.5
 	rangemap@1.8.0
 	rav1e@0.8.1
@@ -476,6 +494,7 @@ CRATES="
 	regex-syntax@0.8.11
 	regex@1.13.1
 	renderdoc-sys@1.1.0
+	reqwest@0.12.28
 	resvg@0.46.0
 	rgb@0.8.53
 	ring@0.17.14
@@ -552,6 +571,7 @@ CRATES="
 	swash@0.2.10
 	syn@2.0.119
 	syn@3.0.9
+	sync_wrapper@1.0.2
 	synstructure@0.14.0
 	sys-locale@0.3.2
 	sysinfo@0.31.4
@@ -573,6 +593,9 @@ CRATES="
 	tiny-skia@0.11.4
 	tinystr@0.8.5
 	tinyvec@1.13.3
+	tokio-macros@2.7.2
+	tokio-rustls@0.26.6
+	tokio-util@0.7.20
 	tokio@1.53.3
 	toml@0.8.23
 	toml@1.1.8+spec-1.1.0
@@ -583,10 +606,15 @@ CRATES="
 	toml_parser@1.1.5+spec-1.1.0
 	toml_write@0.1.2
 	toml_writer@1.1.3+spec-1.1.0
+	tower-http@0.6.11
+	tower-layer@0.3.3
+	tower-service@0.3.3
+	tower@0.5.3
 	tracing-attributes@0.1.31
 	tracing-core@0.1.36
 	tracing@0.1.44
 	trash@5.2.9
+	try-lock@0.2.5
 	ttf-parser@0.25.1
 	twox-hash@2.1.5
 	typed-path@0.13.0
@@ -619,6 +647,7 @@ CRATES="
 	vswhom@0.1.0
 	waker-fn@1.2.0
 	walkdir@2.5.0
+	want@0.3.2
 	wasi@0.11.1+wasi-snapshot-preview1
 	wasip2@1.0.4+wasi-0.2.12
 	wasm-bindgen-futures@0.4.79
@@ -626,6 +655,7 @@ CRATES="
 	wasm-bindgen-macro@0.2.129
 	wasm-bindgen-shared@0.2.129
 	wasm-bindgen@0.2.129
+	wasm-streams@0.4.2
 	wasm_thread@0.3.3
 	wasmparser@0.254.2
 	wayland-backend@0.3.17

@@ -70,12 +70,13 @@ jobs:
         run: |
           {
             echo "plan=$(jq -c . plan.json)"
-            echo "bump=$(jq -c .bump plan.json)"
+            # The release list is only for publish's changelogs
+            echo "bump=$(jq -c '.bump | map(del(.releases))' plan.json)"
             echo "has_work=$(jq '(.bump + .issue) | length > 0' plan.json)"
           } >> "$GITHUB_OUTPUT"
           {
             echo "### New upstream versions"
-            jq -r '(.bump + .issue)[] | "- `\(.atom)` \(.old) → \(.new) (\(.mode))"' plan.json
+            jq -r '(.bump + .issue)[] | "- `\(.atom)` \(.old) → \(.new) (\(.mode)\(if (.releases | length) > 1 then ", \(.releases | length) releases" else "" end))"' plan.json
           } >> "$GITHUB_STEP_SUMMARY"
 
   bump:

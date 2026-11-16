@@ -59,6 +59,12 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
      (also when a bump job was cancelled or crashed before it had a result),
    - an **issue** for `x_mode = "issue"` packages.
 
+   PRs and issues quote the release notes of every GitHub release since the
+   version in the overlay (for `source = "github"` entries), newest first,
+   each in its own collapsed section. Check matches release tags to versions
+   the way nvchecker does (`include_regex`, `prefix`, `from_pattern`, ...).
+   Past 30,000 characters, the older releases are only linked.
+
    Every issue and PR is assigned to the repository owner, and PRs request
    their review (set the `AUTOBUMP_MAINTAINER` environment variable on the
    publish step to use someone else).

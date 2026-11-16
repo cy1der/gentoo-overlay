@@ -97,6 +97,18 @@ def api(method, path, data=None):
         raise RuntimeError(f"{method} {path}: {e.code} {e.read().decode()}") from e
 
 
+def paginate(path, max_pages=0):
+    """Yield the pages of a GitHub list endpoint, 100 items each."""
+    sep = "&" if "?" in path else "?"
+    page = 1
+    while True:
+        items = api("GET", f"{path}{sep}per_page=100&page={page}") or []
+        yield items
+        if len(items) < 100 or page == max_pages:
+            return
+        page += 1
+
+
 def graphql(query, variables):
     req = urllib.request.Request(
         "https://api.github.com/graphql",
@@ -176,6 +188,71 @@ def nvchecker_results(only):
     return results
 
 
+def upstream_version(name, entry, listed):
+    """The version nvchecker reports for a tag or release name, None if it is filtered out.
+
+    Mirrors nvchecker's core.apply_list_options (only for sources that list
+    several versions) and core.substitute_version.
+    """
+    if listed:
+        for key, keep in (("include_regex", True), ("exclude_regex", False)):
+            if entry.get(key) and bool(re.fullmatch(entry[key], name)) != keep:
+                return None
+        if name in entry.get("ignored", "").split():
+            return None
+    prefix = entry.get("prefix")
+    if prefix and name.startswith(prefix):
+        name = name[len(prefix):]
+    if entry.get("from_pattern"):
+        name = re.sub(entry["from_pattern"], entry["to_pattern"], name)
+    return name
+
+
+def releases_between(entry, old, new, max_pages=5):
+    """GitHub releases of entry after old, up to new, newest first, as [{version, url}]."""
+    from portage.versions import vercmp, ververify
+
+    if entry.get("source") != "github" or not entry.get("github"):
+        return []
+    listed = bool(entry.get("use_max_tag") or entry.get("use_max_release"))
+    found = {}
+    for page in paginate(f"/repos/{entry['github']}/releases", max_pages):
+        matched = newer = False
+        for release in page:
+            if release.get("draft"):
+                continue
+            # The latest release is never a prerelease, a tag can be
+            if release.get("prerelease") and not (listed or entry.get("include_prereleases")):
+                continue
+            name = release.get("name") if entry.get("use_release_name") else release.get("tag_name")
+            version = upstream_version(name or "", entry, listed)
+            if not version or not ververify(version):
+                continue
+            matched = True
+            if vercmp(version, old) > 0:
+                newer = True
+                if vercmp(version, new) <= 0:
+                    found.setdefault(version, {"version": version, "url": release["html_url"]})
+        # Newest first, so stop at a page with only older releases. Pages without
+        # any (other components' releases) don't tell.
+        if matched and not newer:
+            break
+    return sorted(found.values(), key=functools.cmp_to_key(lambda a, b: vercmp(b["version"], a["version"])))
+
+
+def releases_for(cp, entry, old, new, url):
+    """The releases a bump covers, falling back to the one nvchecker found."""
+    try:
+        releases = releases_between(entry, old, new)
+    except Exception as e:  # the bump still works without them
+        log(f"{cp}: could not list releases: {e}")
+        releases = []
+    # Only trust the range if it agrees with nvchecker about the newest one
+    if not any(release["version"] == new for release in releases):
+        releases = [{"version": new, "url": url}] if url else []
+    return releases
+
+
 def cmd_check(args):
     from portage.versions import vercmp, ververify
 
@@ -207,6 +284,10 @@ def cmd_check(args):
             "mode": mode,
             "drop_old": bool(entry.get("x_drop_old", True)),
             "url": event.get("url") or "",
+            # For the changelog: every release since the version we have
+            "releases": releases_for(cp, entry, old.split("-r")[0], new, event.get("url"))
+            if ververify(new)
+            else [],
             "slug": cp.replace("/", "_"),
             "key": f"{cp.replace('/', '_')}-{new}",
             # An open PR for an older version: build on its branch so fixes
@@ -310,10 +391,11 @@ def cmd_prompt(args):
 # --- publish -------------------------------------------------------------------
 
 
-def tail(path, lines=60):
+def tail(path, lines=60, chars=10000):
     if not path.exists():
         return ""
-    return "\n".join(path.read_text(errors="replace").splitlines()[-lines:])
+    # Compiler command lines can be very long
+    return "\n".join(path.read_text(errors="replace").splitlines()[-lines:])[-chars:]
 
 
 def details(summary, body, lang="", markdown=False):
@@ -333,8 +415,8 @@ def headline(cp, old, new, url):
     return f"`{cp}` {version} (we have {old})"
 
 
-def changelog(url, limit=20000):
-    """The GitHub release notes behind an nvchecker url, as a collapsed section."""
+def release_notes(url, limit=20000):
+    """The GitHub release notes behind a release url, made safe to quote."""
     m = re.fullmatch(r"https://github\.com/([^/]+/[^/]+)/releases/tag/(.+)", url or "")
     if not m:
         return ""
@@ -358,7 +440,40 @@ def changelog(url, limit=20000):
         lambda m: f"[{m[0]}](https://redirect.github.com/{m[1] or repo}/issues/{m[2]})",
         notes,
     )
-    return details("Changelog", notes, markdown=True)
+    return notes
+
+
+def changelog(item, budget=30000):
+    """The release notes of every release a bump covers, newest first, one
+    collapsed section each. Past the budget, the rest are only linked."""
+    releases = item.get("releases") or ([{"version": item["new"], "url": item["url"]}] if item.get("url") else [])
+    sections, linked = [], []
+    for release in releases:
+        notes = release_notes(release["url"], min(20000, budget)) if budget >= 1000 else ""
+        if notes:
+            sections.append(details(f"Changelog {release['version']}", notes, markdown=True))
+            budget -= len(notes)
+        else:
+            linked.append(release)
+    # The headline already links the new version
+    if linked and (sections or len(linked) > 1):
+        links = ", ".join(f"[{release['version']}]({release['url']})" for release in linked)
+        sections.append(f"Other releases in this bump: {links}.\n")
+    return "".join(sections)
+
+
+# GitHub rejects issue and PR bodies over 65536 characters
+BODY_LIMIT = 60000
+
+
+def fit(make_body, item):
+    """make_body(changelog) with the release notes, or only links to them if too long."""
+    body = make_body(changelog(item))
+    if len(body) > BODY_LIMIT:
+        body = make_body(changelog(item, budget=0))
+    if len(body) > BODY_LIMIT:
+        body = body[:BODY_LIMIT] + "\n\n(cut off)\n"
+    return body
 
 
 def open_issue(item, body, labels):
@@ -540,7 +655,6 @@ def publish_result(result_dir, item, res):
     cp, old, new, status = res["atom"], res["old"], res["new"], res["status"]
     # Changes carried over from an ai-assisted PR still need a careful review
     ai = status == "ai" or (status != "failed" and item.get("base_ai", False))
-    notes = changelog(res["url"])
     ai_summary = (result_dir / "ai-summary.md").read_text() if (result_dir / "ai-summary.md").exists() else ""
     pkgcheck = tail(result_dir / "pkgcheck.txt", 40)
     build = tail(result_dir / "build.log", 60)
@@ -561,15 +675,18 @@ def publish_result(result_dir, item, res):
         log(f"{cp}: regenerating #{existing['number']} failed")
         return
     if status == "failed":
-        body = (
-            f"{headline(cp, old, new, res['url'])}.\n\n"
-            + "Autobump failed.\n\n"
-            + failure_note(res)
-            + (f"## Claude's notes\n\n{ai_summary}\n\n" if ai_summary else "")
-            + notes
-            + details("pkgcheck", pkgcheck)
-            + details("Build log (tail)", build)
-            + small("Comment `@claude <instructions>` to have Claude try again, or bump it by hand.")
+        body = fit(
+            lambda notes: (
+                f"{headline(cp, old, new, res['url'])}.\n\n"
+                + "Autobump failed.\n\n"
+                + failure_note(res)
+                + (f"## Claude's notes\n\n{ai_summary}\n\n" if ai_summary else "")
+                + notes
+                + details("pkgcheck", pkgcheck)
+                + details("Build log (tail)", build)
+                + small("Comment `@claude <instructions>` to have Claude try again, or bump it by hand.")
+            ),
+            item,
         )
         open_issue(res, body, ["autobump", "needs-human"])
         return
@@ -583,14 +700,17 @@ def publish_result(result_dir, item, res):
         commits.append((drop, f"chore({cp}): drop {old}"))
     push_commits(branch, commits)
 
-    body = (
-        f"{headline(cp, old, new, res['url'])}.\n\n"
-        + (f"Supersedes #{item['base_pr']}.\n\n" if item.get("base_pr") else "")
-        + (f"## Claude's summary\n\n{ai_summary or '(no summary written)'}\n\n" if status == "ai" else "")
-        + notes
-        + details("pkgcheck", pkgcheck)
-        + details("Build log (tail)", build)
-        + small("Comment `@claude <instructions>` to have Claude make changes.")
+    body = fit(
+        lambda notes: (
+            f"{headline(cp, old, new, res['url'])}.\n\n"
+            + (f"Supersedes #{item['base_pr']}.\n\n" if item.get("base_pr") else "")
+            + (f"## Claude's summary\n\n{ai_summary or '(no summary written)'}\n\n" if status == "ai" else "")
+            + notes
+            + details("pkgcheck", pkgcheck)
+            + details("Build log (tail)", build)
+            + small("Comment `@claude <instructions>` to have Claude make changes.")
+        ),
+        item,
     )
     if existing:
         pr = update_pr(cp, existing, body, ai, draft=status == "ai")
@@ -608,12 +728,15 @@ def cmd_publish(args):
     failures = 0
     plan = json.loads(Path(args.plan).read_text()) if args.plan else {"issue": []}
     for item in plan["issue"]:
-        body = (
-            f"{headline(item['atom'], item['old'], item['new'], item['url'])}.\n\n"
-            + changelog(item["url"])
-            + small("Comment `@claude <instructions>` for help.")
-        )
         try:
+            body = fit(
+                lambda notes: (
+                    f"{headline(item['atom'], item['old'], item['new'], item['url'])}.\n\n"
+                    + notes
+                    + small("Comment `@claude <instructions>` for help.")
+                ),
+                item,
+            )
             open_issue(item, body, ["autobump"])
         except Exception as e:  # keep going so one failure doesn't hide the rest
             log(f"{item['atom']}: {e}")

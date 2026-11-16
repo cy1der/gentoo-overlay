@@ -815,7 +815,8 @@ SRC_URI="
 S="${WORKDIR}/${P}/launcher"
 
 # CC-BY-4.0: NeoForge logo, OFL-1.1: embedded fonts
-LICENSE="CC-BY-4.0 MIT OFL-1.1"
+# MIT: code merged before upstream moved to LGPL-3+
+LICENSE="CC-BY-4.0 LGPL-3+ MIT OFL-1.1"
 # Dependent crate licenses
 LICENSE+="
 	Apache-2.0 BSD-2 BSD Boost-1.0 CC0-1.0 CDLA-Permissive-2.0 ISC MIT

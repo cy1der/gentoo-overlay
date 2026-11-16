@@ -3,6 +3,7 @@
 
 Subcommands:
   check    find packages with a newer upstream version (needs portage, nvchecker)
+  lint     check nvchecker.toml against the packages in the overlay
   bump     copy the latest ebuild to a new version and regenerate the Manifest
   drop     remove an old ebuild and regenerate the Manifest
   prompt   render the Claude prompt for a bump
@@ -297,13 +298,23 @@ def releases_for(cp, entry, old, new, url):
 def cmd_check(args):
     if args.regenerate and not args.only:
         sys.exit("--regenerate needs --only")
-    config = tomllib.loads(CONFIG.read_text())
     # Problems with single packages. The others are still bumped, and publish
     # fails the run at the end so they get noticed.
     plan = {"bump": [], "issue": [], "errors": []}
+    # Also catches what was pushed to main without CI
+    lint_errors, lint_warnings = lint()
+    for warning in lint_warnings:
+        log(warning)
+    if any(error.startswith(CONFIG.name) for error in lint_errors):
+        sys.exit("\n".join(lint_errors))
+    config = tomllib.loads(CONFIG.read_text())
+    broken = {error.split(":")[0] for error in lint_errors}
     prs = open_prs()
     results, plan["errors"] = nvchecker_results(args.only)
+    plan["errors"] += lint_errors
     for cp, event in sorted(results.items()):
+        if cp in broken:
+            continue
         try:
             item = plan_item(cp, event, config.get(cp, {}), args, prs)
         except Exception as e:
@@ -367,6 +378,55 @@ def plan_item(cp, event, entry, args, prs):
             break
     log(f"{cp}: {old} -> {new} ({mode})")
     return item
+
+
+# --- lint ----------------------------------------------------------------------
+
+# Our own keys in nvchecker.toml, which nvchecker ignores
+OWN_KEYS = {"x_mode", "x_drop_old"}
+
+
+def lint():
+    """Problems in nvchecker.toml, as (errors, warnings). Needs no portage."""
+    try:
+        config = tomllib.loads(CONFIG.read_text())
+    except tomllib.TOMLDecodeError as e:
+        return [f"{CONFIG.name}: {e}"], []
+    # Live ebuilds can't be bumped
+    packages = {str(p.parent.relative_to(ROOT)) for p in ROOT.glob("*/*/*.ebuild") if "9999" not in p.stem}
+    errors, warnings = [], []
+    for cp, entry in config.items():
+        if cp == "__config__":
+            continue
+        if not isinstance(entry, dict):
+            errors.append(f"{cp}: not a table")
+            continue
+        if cp not in packages:
+            errors.append(f"{cp}: no such package (or only live ebuilds), remove its entry")
+        if "source" not in entry:
+            errors.append(f"{cp}: no source")
+        if entry.get("x_mode", "issue") not in MODES:
+            errors.append(f"{cp}: unknown x_mode {entry['x_mode']!r}, use one of {', '.join(MODES)}")
+        if not isinstance(entry.get("x_drop_old", True), bool):
+            errors.append(f"{cp}: x_drop_old must be true or false")
+        for key in sorted(entry):
+            if key.startswith("x_") and key not in OWN_KEYS:
+                errors.append(f"{cp}: unknown key {key}, use one of {', '.join(sorted(OWN_KEYS))}")
+    for cp in sorted(packages - set(config)):
+        warnings.append(f"{cp}: not in {CONFIG.name}, so autobump doesn't check it")
+    return errors, warnings
+
+
+def cmd_lint(args):
+    errors, warnings = lint()
+    # Annotations in GitHub Actions
+    gha = bool(os.environ.get("GITHUB_ACTIONS"))
+    for kind, messages in (("error", errors), ("warning", warnings)):
+        for message in messages:
+            print(f"::{kind}::{message}" if gha else f"{kind}: {message}")
+    if errors:
+        sys.exit(f"{len(errors)} error(s) in {CONFIG.name}")
+    print(f"{CONFIG.name}: ok")
 
 
 # --- bump / drop ---------------------------------------------------------------
@@ -941,6 +1001,9 @@ def main():
     p.add_argument("--retry", action="store_true", help="retry versions that only have an issue")
     p.add_argument("--regenerate", action="store_true", help="redo versions that already have a PR (needs --only)")
     p.set_defaults(func=cmd_check)
+
+    p = sub.add_parser("lint")
+    p.set_defaults(func=cmd_lint)
 
     p = sub.add_parser("bump")
     p.add_argument("atom")

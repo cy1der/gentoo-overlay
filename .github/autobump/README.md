@@ -132,6 +132,13 @@ Use `from_pattern`/`to_pattern` when upstream versions don't map 1:1 to a
 Gentoo version (e.g. `1.0b1` → `1.0_beta1`). Versions that still aren't valid
 Gentoo versions become issues.
 
+`python3 .github/autobump/autobump.py lint` checks the file against the
+overlay. It reports as errors: entries for packages that are gone, unknown
+`x_mode` values, `x_` keys it doesn't know (typos) and entries without a
+`source`. Packages without an entry are only a warning, since opting in is up
+to you. CI runs it on every PR (also when only `nvchecker.toml` changed), and
+check runs it daily, so changes pushed straight to `main` are caught too.
+
 ## Running it
 
 - **Schedule:** daily at 06:17 UTC.

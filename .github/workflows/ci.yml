@@ -5,6 +5,7 @@ on:
     paths:
       - "*/*/**"
       - "!.github/**"
+      - ".github/autobump/nvchecker.toml"
 
 permissions:
   contents: read
@@ -107,3 +108,8 @@ jobs:
         with:
           path: ~/gentoo-cache
           key: gentoo-ci-${{ github.event.pull_request.number }}-${{ github.run_id }}
+
+      # Entries for removed packages, unknown x_mode values, typos in x_ keys
+      - name: Lint nvchecker.toml
+        if: always()
+        run: python3 .github/autobump/autobump.py lint

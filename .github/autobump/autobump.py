@@ -281,13 +281,26 @@ def cmd_drop(args):
 
 def cmd_prompt(args):
     text = (HERE / "prompt.md").read_text()
-    failure = Path(args.log).read_text()[-12000:] if args.log else ""
+    failure = Path(args.log).read_text(errors="replace")[-12000:] if args.log else ""
+    if args.deps_log:
+        deps_log = Path(args.deps_log).read_text(errors="replace")[-6000:].rstrip()
+        deps = (
+            "Installing its build-time dependencies failed, so some of them (maybe "
+            "its toolchain) are missing:\n\n```\n" + deps_log + "\n```"
+        )
+    else:
+        deps = (
+            "Its build-time dependencies are installed, so the toolchain it needs "
+            "(Rust, Go, .NET, Python, ...) is there and `ebuild <file> unpack` works "
+            "for both versions."
+        )
     for key, value in {
         "ATOM": args.atom,
         "OLD": args.old,
         "NEW": args.new,
         "URL": args.url or "(none)",
         "ROUND_MINUTES": str(args.round_minutes),
+        "DEPS": deps,
         "FAILURE": failure or "(not built yet)",
     }.items():
         text = text.replace("{{" + key + "}}", value)
@@ -666,6 +679,7 @@ def main():
     p.add_argument("new")
     p.add_argument("--url")
     p.add_argument("--log", help="build log of the failed attempt")
+    p.add_argument("--deps-log", help="log of a failed attempt to install the build-time dependencies")
     p.add_argument("--round-minutes", type=int, default=60, help="time limit of each Claude round")
     p.set_defaults(func=cmd_prompt)
 

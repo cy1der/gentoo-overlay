@@ -36,6 +36,11 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
      new ebuild (deps, patches, `CRATES`, ...). The workflow re-runs pkgcheck
      and emerge after each round; Claude saying it's done isn't enough. Each
      round is stopped after `CLAUDE_ROUND_MINUTES` (60).
+   - Before Claude starts, the package's build-time dependencies are installed
+     (`gentoo.sh deps`), so its toolchain (Rust, Go, .NET, ...) is there and
+     Claude can unpack and compare both versions. Nothing is set up per
+     language: what gets installed comes from the ebuild. If that fails,
+     Claude is shown why.
    - Only changes inside the package directory are kept.
    - The bump step's log shows pkgcheck and the build as they run, and when
      each Claude round has to stop. Claude's own output is in the result

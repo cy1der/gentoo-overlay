@@ -3,6 +3,7 @@
 # see .github/autobump/README.md.
 #
 #   gentoo.sh setup                           sync ::gentoo and install the tools
+#   gentoo.sh deps =<cat/pn>-<ver>            install the build-time deps of one version
 #   gentoo.sh build =<cat/pn>-<ver>           build one version (build-time deps only)
 #   gentoo.sh verify <cat/pn> <ver> <log>     pkgcheck + build one version
 #   gentoo.sh job <cat/pn> <old> <new> <mode> <drop_old> <url>
@@ -19,7 +20,7 @@ CLAUDE_MAX_TURNS=${CLAUDE_MAX_TURNS:-80}
 # BUDGET_MINUTES (set by autobump.yml, no limit when unset).
 CLAUDE_ROUND_MINUTES=${CLAUDE_ROUND_MINUTES:-60}
 export PATH="${HOME}/.local/bin:${PATH}"
-CLAUDE_TOOLS="Read,Edit,Write,Glob,Grep,WebFetch,Bash(${SELF} build:*),Bash(ebuild:*),Bash(emerge:*),Bash(pkgdev:*),Bash(pkgcheck:*),Bash(pycargoebuild:*),Bash(python3:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(diff:*),Bash(tar:*),Bash(ls:*),Bash(find:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*)"
+CLAUDE_TOOLS="Read,Edit,Write,Glob,Grep,WebFetch,Bash(${SELF} build:*),Bash(${SELF} deps:*),Bash(ebuild:*),Bash(emerge:*),Bash(pkgdev:*),Bash(pkgcheck:*),Bash(pycargoebuild:*),Bash(python3:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(diff:*),Bash(tar:*),Bash(ls:*),Bash(find:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*)"
 
 setup() {
 	# A restored actions/cache belongs to the runner user, but portage and
@@ -48,19 +49,33 @@ setup() {
 	git config --global --add safe.directory "${OVERLAY}"
 }
 
-# Builds one version with its default USE, installing only what building and
-# installing it needs (DEPEND, BDEPEND, IDEPEND). Its runtime-only dependencies
-# are left out: they're not needed to build it, and a GUI toolkit that is only
-# used at run time can take hours to compile.
+# Sets the caller's opts to the emerge options for the =atom $1: never reuse a
+# binpkg of the package under test, always build it.
 # Every command needs "|| return 1": set -e is off when called from an if.
-build() {
-	local atom=$1 cp
-	cp=$(python3 -c 'import sys; from portage.versions import cpv_getkey; print(cpv_getkey(sys.argv[1].lstrip("=")))' "${atom}") \
+pkg_opts() {
+	local cp
+	cp=$(python3 -c 'import sys; from portage.versions import cpv_getkey; print(cpv_getkey(sys.argv[1].lstrip("=")))' "$1") \
 		|| return 1
-	# Never reuse a binpkg of the package under test, always build it
-	local opts=(--oneshot --usepkg-exclude "${cp}" --buildpkg-exclude "${cp}")
-	emerge "${opts[@]}" --onlydeps --onlydeps-with-rdeps=n --onlydeps-with-ideps=y "${atom}" || return 1
-	emerge "${opts[@]}" --nodeps "${atom}" || return 1
+	opts=(--oneshot --usepkg-exclude "${cp}" --buildpkg-exclude "${cp}")
+}
+
+# Installs only what building and installing one version needs (DEPEND,
+# BDEPEND, IDEPEND), not the package itself. Its runtime-only dependencies are
+# left out: they're not needed to build it, and a GUI toolkit that is only used
+# at run time can take hours to compile.
+deps() {
+	local opts
+	pkg_opts "$1" || return 1
+	emerge "${opts[@]}" --onlydeps --onlydeps-with-rdeps=n --onlydeps-with-ideps=y "$1" || return 1
+}
+
+# Builds one version with its default USE, after installing its build-time
+# dependencies (see deps).
+build() {
+	local opts
+	pkg_opts "$1" || return 1
+	deps "$1" || return 1
+	emerge "${opts[@]}" --nodeps "$1" || return 1
 }
 
 # Runs a command for at most $1 seconds (0: no limit of its own) and never past
@@ -135,8 +150,20 @@ stop_strays() {
 	kill -KILL "${strays[@]}" 2> /dev/null || true
 }
 
+# Runs gentoo.sh <step> <atom> ($1, $2) within the time left, and stops what it
+# left behind when it ran out of time.
+limited_step() {
+	local rc=0
+	limited 0 "${SELF}" "$@" || rc=$?
+	if ((rc == 124)); then
+		echo ">>> stopped: out of time"
+		stop_strays "${follow_pid:-}"
+	fi
+	return "${rc}"
+}
+
 check_and_build() {
-	local cp=$1 ver=$2 keep=$3 rc=0
+	local cp=$1 ver=$2
 	# Only the new version: the previous one may be dropped by this bump, and
 	# CI checks the whole package as it ends up
 	echo ">>> pkgcheck scan =${cp}-${ver}"
@@ -144,28 +171,31 @@ check_and_build() {
 		|| { cat "${OUT}/pkgcheck.txt"; return 1; }
 	cat "${OUT}/pkgcheck.txt"
 	echo ">>> build =${cp}-${ver}"
-	limited 0 "${SELF}" build "=${cp}-${ver}" || rc=$?
-	if ((rc == 124)); then
-		echo ">>> stopped: out of time"
-		stop_strays "${keep}"
-	fi
+	limited_step build "=${cp}-${ver}"
+}
+
+# Runs a command with its output in $1, which is also followed in the step log.
+# Not with a pipe to tee: processes left over from a timed-out build would keep
+# that pipe, and with it this function, open. follow_pid is the tail, which
+# stop_strays must leave alone.
+follow() {
+	local log=$1 rc=0
+	shift
+	: > "${log}"
+	tail -f -n +1 "${log}" &
+	follow_pid=$!
+	"$@" >> "${log}" 2>&1 || rc=$?
+	# Let tail catch up before stopping it
+	sleep 1
+	kill "${follow_pid}" 2> /dev/null || true
+	wait "${follow_pid}" 2> /dev/null || true
+	follow_pid=
 	return "${rc}"
 }
 
-# pkgcheck and build one version into $log, which is also followed in the step
-# log. Not with a pipe to tee: processes left over from a timed-out build
-# would keep that pipe, and with it verify, open.
+# pkgcheck and build one version into $log
 verify() {
-	local cp=$1 ver=$2 log=$3 rc=0 follow
-	: > "${log}"
-	tail -f -n +1 "${log}" &
-	follow=$!
-	check_and_build "${cp}" "${ver}" "${follow}" >> "${log}" 2>&1 || rc=$?
-	# Let tail catch up before stopping it
-	sleep 1
-	kill "${follow}" 2> /dev/null || true
-	wait "${follow}" 2> /dev/null || true
-	return "${rc}"
+	follow "$3" check_and_build "$1" "$2"
 }
 
 # verify, setting the caller's timed_out when it ran out of time. Past the
@@ -234,14 +264,23 @@ job() {
 
 	if [[ ${status} == failed && -n ${claude_token} && ${timed_out} == false ]]; then
 		install_claude
-		local prompt_args=(--url "${url}")
+		local prompt_args=(--url "${url}") before rc=0 rounds=${CLAUDE_ROUNDS}
 		# Hand over the log only when something actually failed
 		if [[ ${mode} == pr || ${bumped} == false ]]; then
 			prompt_args+=(--log "${OUT}/build.log")
 		fi
-		local before rc
+		# Claude needs the package's toolchain (Rust, Go, .NET, ...) to unpack and
+		# inspect it. The mechanical build only installs it when it gets that far:
+		# not in ai mode, or when pkgcheck fails first. Otherwise this is quick.
+		echo ">>> build dependencies of =${cp}-${new}"
+		follow "${OUT}/deps.log" limited_step deps "=${cp}-${new}" || rc=$?
+		case ${rc} in
+			0) ;;
+			124) timed_out=true rounds=0 ;;
+			*) prompt_args+=(--deps-log "${OUT}/deps.log") ;;
+		esac
 		before=$(pkg_state "${cp}")
-		for ((round = 1; round <= CLAUDE_ROUNDS; round++)); do
+		for ((round = 1; round <= rounds; round++)); do
 			local stop=$((CLAUDE_ROUND_MINUTES * 60))
 			if [[ -n ${DEADLINE:-} ]] && ((DEADLINE - SECONDS < stop)); then
 				stop=$((DEADLINE - SECONDS))

@@ -5,8 +5,10 @@ are running inside a throwaway `gentoo/stage3` container with the overlay at
 Upstream release: {{URL}}
 
 The workflow already copied the newest ebuild to {{NEW}} and tried to
-regenerate the Manifest (and, unless noted below, to build it). Your job is to
-make `{{ATOM}}-{{NEW}}` pass
+regenerate the Manifest (and, unless noted below, to build it).
+{{DEPS}}
+
+Your job is to make `{{ATOM}}-{{NEW}}` pass
 `pkgcheck scan --exit error,warning,style -- ={{ATOM}}-{{NEW}}` and build with
 `/overlay/.github/autobump/gentoo.sh build ={{ATOM}}-{{NEW}}`.
 
@@ -35,6 +37,9 @@ How to approach it:
    `BDEPEND`, `IDEPEND`), then the package without its runtime-only ones. Don't
    build with a plain `emerge`, which also builds every runtime dependency. If
    the build needs something that is only in `RDEPEND`, add it to `BDEPEND`.
+   To install the build-time dependencies without building the package (e.g.
+   after adding some), run
+   `/overlay/.github/autobump/gentoo.sh deps ={{ATOM}}-{{NEW}}`.
 
 Rules:
 - Only change files under `{{ATOM}}/`. Changes anywhere else are discarded.

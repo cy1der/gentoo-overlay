@@ -180,7 +180,9 @@ check runs it daily, so changes pushed straight to `main` are caught too.
 
 - The bump job (which builds upstream code and runs Claude) has a read-only
   `GITHUB_TOKEN` and no push credentials. Only the publish job gets the App
-  token, and it only applies patches and calls the API.
+  token, and it only applies patches and calls the API. The `caches` job's
+  token may delete Actions caches (`actions: write`); it runs nothing from
+  upstream.
 - `main` should have a ruleset that only lets the repository admin update it,
   so neither the bot nor `@claude` can push there directly; they can only
   open PRs.
@@ -191,3 +193,24 @@ check runs it daily, so changes pushed straight to `main` are caught too.
   leaks, revoke it at <https://claude.ai/settings>.
 - `claude.yml` only reacts to the repository owner. CI on fork PRs runs
   without secrets.
+
+## Known limits
+
+Not a problem yet, but worth knowing as the overlay grows:
+
+- **Late runs.** GitHub delays scheduled workflows under load. Runs set for
+  06:17 UTC have started 7 to 10 hours late. That doesn't matter for daily
+  bumps. Use *Run workflow* when timing does.
+- **API budget.** Check uses the job's `GITHUB_TOKEN`, which allows 1,000
+  requests an hour: about one per package for nvchecker, plus a few per
+  outdated package. At several hundred packages, give check the App token.
+- **Setup per job.** Every bump job sets up its container from scratch
+  (`gentoo.sh setup`, a few minutes). A prebuilt image, refreshed daily,
+  would save that once there are many bumps a day.
+- **Claude usage.** Each new version of an `x_mode = "ai"` package costs a
+  Claude session, and horizon-launcher releases about once a day. If that
+  hits the plan's limits, a minimum release age or a weekly schedule per
+  package (like Renovate's `minimumReleaseAge`) would throttle it.
+- **No cap per run.** Apart from GitHub's 256-job matrix limit, nothing
+  limits how many bumps a run starts. With `max-parallel: 4`, opting in many
+  packages at once can queue many long jobs.

@@ -242,10 +242,17 @@ claude_round() {
 	local args=(-p --max-turns "${CLAUDE_MAX_TURNS}" --permission-mode acceptEdits --allowedTools "${CLAUDE_TOOLS}"
 		--add-dir /var/tmp/portage --add-dir /var/cache/distfiles)
 	((round > 1)) && args+=(--continue)
-	local rc=0
+	# The whole transcript, with every command Claude ran and what it got back
+	args+=(--output-format stream-json --verbose)
+	local rc=0 out=${OUT}/claude-round-${round}
 	(cd "${OVERLAY}" && CLAUDE_CODE_OAUTH_TOKEN=${claude_token} limited "$((CLAUDE_ROUND_MINUTES * 60))" claude "${args[@]}") \
-		> "${OUT}/claude-round-${round}.txt" 2>&1 || rc=$?
+		> "${out}.jsonl" 2>&1 || rc=$?
 	stop_strays
+	# Claude's final message to claude-round-N.txt, the commands it wasn't
+	# allowed to run to denied.txt (publish lists them). The token is taken out
+	# of the transcript, which is uploaded: GitHub only masks it in logs.
+	echo ">>> Claude round ${round}: $(REDACT=${claude_token} "${AUTOBUMP[@]}" transcript "${out}.jsonl" "${out}.txt" \
+		"${OUT}/denied.txt" || echo "?")"
 	return "${rc}"
 }
 

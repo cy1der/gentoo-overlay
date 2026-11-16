@@ -50,9 +50,14 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
      language: what gets installed comes from the ebuild. If that fails,
      Claude is shown why.
    - Only changes inside the package directory are kept.
-   - The bump step's log shows pkgcheck and the build as they run, and when
-     each Claude round has to stop. Claude's own output is in the result
-     artifact.
+   - The bump step's log shows pkgcheck and the build as they run, when each
+     Claude round has to stop, and how many turns it took. The result
+     artifact has each round's full transcript (`claude-round-N.jsonl`,
+     every command and its output) and Claude's final message
+     (`claude-round-N.txt`).
+   - Commands Claude wasn't allowed to run are listed in the PR or issue. A
+     recurring one means `CLAUDE_TOOLS` in `gentoo.sh` or the container is
+     missing something.
    - A bump gives up after `BUDGET_MINUTES` (320, set in the workflow), so
      the job still saves its cache and uploads the result before the 6 h
      limit. It becomes a `needs-human` issue saying it ran out of time.

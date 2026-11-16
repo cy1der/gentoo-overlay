@@ -6,6 +6,7 @@ Subcommands:
   bump     copy the latest ebuild to a new version and regenerate the Manifest
   drop     remove an old ebuild and regenerate the Manifest
   prompt   render the Claude prompt for a bump
+  transcript  summarize the output of a Claude round
   publish  push branches and open PRs/issues for the results of a run
   prune-caches  delete superseded Actions cache entries
 """
@@ -442,6 +443,58 @@ def cmd_prompt(args):
     print(text)
 
 
+# --- transcript ----------------------------------------------------------------
+
+
+def cmd_transcript(args):
+    """Summarize a Claude round's stream-json output.
+
+    Writes Claude's final message (and anything that isn't JSON, such as
+    errors) to `text`, appends the commands it was denied to `denied`, and
+    prints a one-line status for the step log.
+    """
+    raw = Path(args.jsonl).read_text(errors="replace")
+    # The transcript is uploaded as an artifact, where GitHub doesn't mask secrets
+    secret = os.environ.get("REDACT", "")
+    if len(secret) >= 8 and secret in raw:
+        raw = raw.replace(secret, "[REDACTED]")
+        Path(args.jsonl).write_text(raw)
+    result, other = None, []
+    for line in raw.splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            if line.strip():
+                other.append(line)
+            continue
+        if isinstance(event, dict) and event.get("type") == "result":
+            result = event
+    denied = []
+    for denial in (result or {}).get("permission_denials") or []:
+        if not isinstance(denial, dict):
+            denied.append(str(denial))
+            continue
+        tool_input = denial.get("tool_input") if isinstance(denial.get("tool_input"), dict) else {}
+        what = tool_input.get("command") or tool_input.get("file_path") or tool_input.get("url") or json.dumps(tool_input)
+        denied.append(f"{denial.get('tool_name', '?')}: {what}")
+    text = (result or {}).get("result") or "(no result)"
+    Path(args.text).write_text(text.rstrip() + ("\n\n" + "\n".join(other) if other else "") + "\n")
+    if denied:
+        with open(args.denied, "a") as f:
+            f.writelines(" ".join(d.split())[:300] + "\n" for d in denied)
+    if not result:
+        print("no result" + (f": {other[-1][:200]}" if other else ""))
+        return
+    status = f"{result.get('num_turns', '?')} turns"
+    if result.get("subtype") == "error_max_turns":
+        status += ", stopped at the turn limit"
+    elif result.get("is_error"):
+        status += f", {result.get('subtype') or 'error'}"
+    if denied:
+        status += f", {len(denied)} command(s) denied"
+    print(status)
+
+
 # --- publish -------------------------------------------------------------------
 
 
@@ -458,6 +511,16 @@ def details(summary, body, lang="", markdown=False):
     if not markdown:
         body = f"```{lang}\n{body}\n```"
     return f"<details><summary>{summary}</summary>\n\n{body}\n\n</details>\n"
+
+
+def denied_commands(result_dir):
+    """The commands Claude wasn't allowed to run, a sign the tool allowlist or
+    the container is missing something."""
+    path = result_dir / "denied.txt"
+    if not path.exists():
+        return ""
+    lines = list(dict.fromkeys(line for line in path.read_text(errors="replace").splitlines() if line.strip()))
+    return details(f"Commands Claude was not allowed to run ({len(lines)})", "\n".join(lines[:50])) if lines else ""
 
 
 def small(text):
@@ -714,6 +777,7 @@ def publish_result(result_dir, item, res):
     # Changes carried over from an ai-assisted PR still need a careful review
     ai = status == "ai" or (status != "failed" and item.get("base_ai", False))
     ai_summary = (result_dir / "ai-summary.md").read_text() if (result_dir / "ai-summary.md").exists() else ""
+    denied = denied_commands(result_dir)
     pkgcheck = tail(result_dir / "pkgcheck.txt", 40)
     build = tail(result_dir / "build.log", 60)
     branch = branch_name(cp, new)
@@ -726,6 +790,7 @@ def publish_result(result_dir, item, res):
             "Regenerating failed, the PR is unchanged.\n\n"
             + failure_note(res)
             + (f"## Claude's notes\n\n{ai_summary}\n\n" if ai_summary else "")
+            + denied
             + details("pkgcheck", pkgcheck)
             + details("Build log (tail)", build)
         )
@@ -739,6 +804,7 @@ def publish_result(result_dir, item, res):
                 + "Autobump failed.\n\n"
                 + failure_note(res)
                 + (f"## Claude's notes\n\n{ai_summary}\n\n" if ai_summary else "")
+                + denied
                 + notes
                 + details("pkgcheck", pkgcheck)
                 + details("Build log (tail)", build)
@@ -763,6 +829,7 @@ def publish_result(result_dir, item, res):
             f"{headline(cp, old, new, res['url'])}.\n\n"
             + (f"Supersedes #{item['base_pr']}.\n\n" if item.get("base_pr") else "")
             + (f"## Claude's summary\n\n{ai_summary or '(no summary written)'}\n\n" if status == "ai" else "")
+            + denied
             + notes
             + details("pkgcheck", pkgcheck)
             + details("Build log (tail)", build)
@@ -899,6 +966,12 @@ def main():
     p.add_argument("--plan", help="plan.json from check (for issue-mode items)")
     p.add_argument("--results", help="directory of per-package result dirs")
     p.set_defaults(func=cmd_publish)
+
+    p = sub.add_parser("transcript")
+    p.add_argument("jsonl", help="claude -p --output-format stream-json output")
+    p.add_argument("text", help="write Claude's final message here")
+    p.add_argument("denied", help="append the commands Claude was denied here")
+    p.set_defaults(func=cmd_transcript)
 
     p = sub.add_parser("prune-caches")
     p.add_argument("--dry-run", action="store_true", help="only list what would be deleted")

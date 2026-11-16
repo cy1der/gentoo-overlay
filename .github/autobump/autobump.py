@@ -7,6 +7,7 @@ Subcommands:
   drop     remove an old ebuild and regenerate the Manifest
   prompt   render the Claude prompt for a bump
   publish  push branches and open PRs/issues for the results of a run
+  prune-caches  delete superseded Actions cache entries
 """
 
 import argparse
@@ -101,12 +102,17 @@ def api(method, path, data=None):
         raise RuntimeError(f"{method} {path}: {e.code} {e.read().decode()}") from e
 
 
-def paginate(path, max_pages=0):
-    """Yield the pages of a GitHub list endpoint, 100 items each."""
+def paginate(path, max_pages=0, key=None):
+    """Yield the pages of a GitHub list endpoint, 100 items each.
+
+    key: for endpoints that wrap the list in an object.
+    """
     sep = "&" if "?" in path else "?"
     page = 1
     while True:
         items = api("GET", f"{path}{sep}per_page=100&page={page}") or []
+        if key:
+            items = items[key] if items else []
         yield items
         if len(items) < 100 or page == max_pages:
             return
@@ -825,6 +831,35 @@ def cmd_publish(args):
         sys.exit(f"{failures} item(s) failed to publish, check found {len(plan.get('errors', []))} problem(s)")
 
 
+# --- prune-caches --------------------------------------------------------------
+
+
+def cmd_prune_caches(args):
+    """Delete all but the newest Actions cache entry of each package and CI PR.
+
+    The keys end in the run ID, so each run saves new entries next to the old
+    ones, and GitHub only evicts them once the repository is over its limit.
+    """
+    caches = [
+        cache
+        for page in paginate(f"/repos/{REPO}/actions/caches?sort=created_at&direction=desc", key="actions_caches")
+        for cache in page
+    ]
+    newest, freed = set(), 0
+    for cache in caches:  # newest first
+        m = re.fullmatch(r"(gentoo-.+)-\d+", cache["key"])
+        if not m:
+            continue
+        if (cache["ref"], m[1]) not in newest:
+            newest.add((cache["ref"], m[1]))
+            continue
+        if not args.dry_run:
+            api("DELETE", f"/repos/{REPO}/actions/caches/{cache['id']}")
+        freed += cache["size_in_bytes"]
+        log(f"{'would delete' if args.dry_run else 'deleted'} {cache['key']} ({cache['size_in_bytes'] / 1e9:.2f} GB)")
+    log(f"kept {len(newest)} cache entries, {'would free' if args.dry_run else 'freed'} {freed / 1e9:.2f} GB")
+
+
 # --- main ----------------------------------------------------------------------
 
 
@@ -864,6 +899,10 @@ def main():
     p.add_argument("--plan", help="plan.json from check (for issue-mode items)")
     p.add_argument("--results", help="directory of per-package result dirs")
     p.set_defaults(func=cmd_publish)
+
+    p = sub.add_parser("prune-caches")
+    p.add_argument("--dry-run", action="store_true", help="only list what would be deleted")
+    p.set_defaults(func=cmd_prune_caches)
 
     args = parser.parse_args()
     if getattr(args, "only", None) == "":

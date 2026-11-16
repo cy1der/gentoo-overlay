@@ -6,6 +6,7 @@
 #   gentoo.sh deps =<cat/pn>-<ver>            install the build-time deps of one version
 #   gentoo.sh build =<cat/pn>-<ver>           build one version (build-time deps only)
 #   gentoo.sh verify <cat/pn> <ver> <log>     pkgcheck + build one version
+#   gentoo.sh prune [<cat/pn>...]             drop distfiles and binpkgs of what isn't installed
 #   gentoo.sh job <cat/pn> <old> <new> <mode> <drop_old> <url>
 #                                             bump one package, results go to .autobump-out/
 set -euo pipefail
@@ -45,8 +46,27 @@ setup() {
 	printf '[cy1der]\nlocation = %s\n' "${OVERLAY}" > /etc/portage/repos.conf/cy1der.conf
 	echo "*/*::cy1der ~amd64" > /etc/portage/package.accept_keywords/cy1der
 	getuto
-	emerge --oneshot --noreplace dev-vcs/git dev-util/pkgdev dev-util/pkgcheck app-portage/pycargoebuild
+	emerge --oneshot --noreplace dev-vcs/git dev-util/pkgdev dev-util/pkgcheck app-portage/pycargoebuild \
+		app-portage/gentoolkit
 	git config --global --add safe.directory "${OVERLAY}"
+}
+
+# Keeps only the distfiles and binpkgs of what is installed: stage3, the
+# package's build dependencies and the package. Otherwise the cache saved
+# after a job holds everything every job before it restored and added to, and
+# outgrows the repository's 10 GB. The distfiles of the packages given are
+# kept even when they aren't installed, so a retry after a failed build
+# doesn't download them again.
+prune() {
+	command -v eclean-dist > /dev/null || return 0
+	local keep
+	keep=$(mktemp)
+	printf '%s\n' "$@" > "${keep}"
+	echo ">>> cache before (distfiles, binpkgs): $(du -sh /var/cache/distfiles /var/cache/binpkgs | cut -f1 | xargs)"
+	eclean-dist --deep --quiet --exclude-file="${keep}" || true
+	eclean-pkg --deep --quiet || true
+	echo ">>> cache after: $(du -sh /var/cache/distfiles /var/cache/binpkgs | cut -f1 | xargs)"
+	rm -f "${keep}"
 }
 
 # Sets the caller's opts to the emerge options for the =atom $1: never reuse a

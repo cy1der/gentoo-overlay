@@ -37,7 +37,7 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
    toolkit it only uses at run time, and a build that needs something only
    listed in `RDEPEND` fails, as it should (it belongs in `BDEPEND`).
    Dependencies come from Gentoo's official binhost, and distfiles and binpkgs
-   are cached between runs. Dependencies that are only `~amd64` in ::gentoo
+   are cached between runs (see [Cache](#cache)). Dependencies that are only `~amd64` in ::gentoo
    are keyworded automatically
    (`--autounmask-keep-keywords=n`), but `package.mask` is respected.
    - If that fails, or the package is `x_mode = "ai"`, Claude Code edits the
@@ -94,6 +94,20 @@ portage, so the CI workflow on the PR does the build check.
 the changed packages and builds the changed ebuilds on every PR, the same way
 as bump does (`info` findings are shown but don't fail it). Add the `skip-build` label for packages too heavy for a hosted
 runner.
+
+### Cache
+
+Each bump job restores the newest cache of its package (or else the newest
+of any package), and saves a new one under `gentoo-<cat>_<pn>-<run id>`.
+Before saving, `gentoo.sh prune` (eclean) removes the distfiles and binpkgs
+of anything the container didn't install, so a package's cache only holds
+what it needs. The `caches` job then deletes all but the newest entry per
+package. Without both, entries grow with every run and the repository's
+10 GB fills up.
+
+CI restores the PR's own cache, else the package's autobump cache. It
+doesn't save one for autobump PRs, whose bump job just saved the same
+package.
 
 ## Configuring packages
 

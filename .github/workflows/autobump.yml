@@ -145,6 +145,13 @@ jobs:
           docker exec -e CLAUDE_CODE_OAUTH_TOKEN -e BUDGET_MINUTES gentoo /overlay/.github/autobump/gentoo.sh \
             job "$ATOM" "$OLD" "$NEW" "$MODE" "$DROP_OLD" "$URL"
 
+      - name: Prune the cache
+        if: always()
+        continue-on-error: true
+        env:
+          ATOM: ${{ matrix.item.atom }}
+        run: docker exec gentoo /overlay/.github/autobump/gentoo.sh prune "$ATOM"
+
       - name: Make the cache readable
         if: always()
         run: sudo chmod -R a+rX ~/gentoo-cache
@@ -156,6 +163,25 @@ jobs:
           path: .autobump-out/
           include-hidden-files: true
           retention-days: 14
+
+  caches:
+    needs: [check, bump]
+    # After the bump jobs saved theirs
+    if: always() && !inputs.dry_run
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/autobump
+
+      - name: Delete superseded cache entries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/autobump/autobump.py prune-caches
 
   publish:
     needs: [check, bump]

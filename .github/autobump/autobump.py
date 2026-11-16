@@ -35,6 +35,10 @@ MODES = ("pr", "ai", "issue")
 CLAUDE_TRAILER = "Co-Authored-By: Claude <noreply@anthropic.com>"
 
 
+class AutobumpError(Exception):
+    """A problem with one package, which shouldn't stop the others."""
+
+
 def log(msg):
     print(msg, file=sys.stderr, flush=True)
 
@@ -60,7 +64,7 @@ def ebuilds(cp):
             continue
         found.append((ver if rev == "r0" else f"{ver}-{rev}", path))
     if not found:
-        sys.exit(f"{cp}: no ebuilds found")
+        raise AutobumpError("no ebuilds found")
     return sorted(found, key=functools.cmp_to_key(lambda a, b: vercmp(a[0], b[0])))
 
 
@@ -134,24 +138,49 @@ def issue_title(cp, ver):
     return f"{cp}: {ver} available"
 
 
+@functools.cache
+def autobump_issues():
+    """Every issue labelled autobump, open or closed, listed once per run.
+
+    Not with the search API: it allows only 30 requests a minute, and its
+    results can lag behind. open_issue and close_issue keep this up to date.
+    """
+    return [
+        issue
+        for page in paginate(f"/repos/{REPO}/issues?labels=autobump&state=all")
+        for issue in page
+        if "pull_request" not in issue
+    ]
+
+
 def find_issues(cp, ver, state=""):
     """Issues titled for cp-ver, optionally only "open" or "closed" ones."""
-    query = f'repo:{REPO} is:issue in:title "{issue_title(cp, ver)}"'
-    if state:
-        query += f" is:{state}"
-    found = api("GET", f"/search/issues?q={q(query)}")
-    return [i for i in found["items"] if i["title"] == issue_title(cp, ver)]
+    title = issue_title(cp, ver)
+    return [i for i in autobump_issues() if i["title"] == title and state in ("", i["state"])]
+
+
+def close_issue(issue, comment, reason):
+    api("POST", f"/repos/{REPO}/issues/{issue['number']}/comments", {"body": comment})
+    api("PATCH", f"/repos/{REPO}/issues/{issue['number']}", {"state": "closed", "state_reason": reason})
+    issue["state"] = "closed"
+
+
+def open_prs():
+    return [pr for page in paginate(f"/repos/{REPO}/pulls?state=open") for pr in page]
 
 
 def already_handled(cp, ver, check_issues=True):
-    """True if a branch, PR (in any state) or issue already exists for cp-ver."""
+    """True if a PR (in any state) or issue already exists for cp-ver."""
     branch = branch_name(cp, ver)
     owner = REPO.split("/")[0]
-    if api("GET", f"/repos/{REPO}/branches/{q(branch)}"):
-        return True
     if api("GET", f"/repos/{REPO}/pulls?state=all&head={q(owner + ':' + branch)}"):
         return True
-    return check_issues and bool(find_issues(cp, ver))
+    if check_issues and find_issues(cp, ver):
+        return True
+    # Left behind when opening its PR failed. Publish reuses the branch.
+    if api("GET", f"/repos/{REPO}/branches/{q(branch)}"):
+        log(f"{cp}: {branch} has no PR, bumping {ver} again")
+    return False
 
 
 # --- check -------------------------------------------------------------------
@@ -171,7 +200,7 @@ def nvchecker_results(only):
             keyfile.flush()
             cmd += ["-k", keyfile.name]
         proc = subprocess.run(cmd, cwd=HERE, text=True, capture_output=True)
-    results, failed = {}, []
+    results, problems = {}, {}
     for line in proc.stdout.splitlines() + proc.stderr.splitlines():
         try:
             event = json.loads(line)
@@ -180,12 +209,17 @@ def nvchecker_results(only):
         if "version" in event and event.get("name"):
             results[event["name"]] = event
         elif event.get("level") in ("error", "warning"):
-            failed.append(event.get("name", "?"))
-            # Shows up as an annotation on the workflow run
-            print(f"::warning::nvchecker: {event.get('name', '?')}: {event.get('event')} {event.get('error', '')}", file=sys.stderr)
-    if failed and not results:
+            message = f"{event.get('event')} {event.get('error', '')}".strip()
+            log(f"nvchecker: {event.get('name', '?')}: {message}")
+            # Errors can carry the whole HTTP response
+            if len(message) > 160:
+                message = message[:160] + "..."
+            problems.setdefault(event.get("name", "?"), []).append(message)
+    if problems and not results:
         sys.exit("nvchecker could not check any package")
-    return results
+    # Warnings about a package that still got a version don't matter
+    failed = [f"{name}: nvchecker: {'; '.join(msgs)}" for name, msgs in sorted(problems.items()) if name not in results]
+    return results, failed
 
 
 def upstream_version(name, entry, listed):
@@ -254,64 +288,78 @@ def releases_for(cp, entry, old, new, url):
 
 
 def cmd_check(args):
-    from portage.versions import vercmp, ververify
-
     if args.regenerate and not args.only:
         sys.exit("--regenerate needs --only")
     config = tomllib.loads(CONFIG.read_text())
-    plan = {"bump": [], "issue": []}
-    open_prs = api("GET", f"/repos/{REPO}/pulls?state=open&per_page=100") or []
-    for cp, event in sorted(nvchecker_results(args.only).items()):
-        entry = config.get(cp, {})
-        old, _ = latest(cp)
-        new = event["version"]
-        if not ververify(new):
-            log(f"{cp}: upstream version {new!r} is not a valid Gentoo version, opening an issue")
-            mode = "issue"
-        elif vercmp(new, old.split("-r")[0]) <= 0:
+    # Problems with single packages. The others are still bumped, and publish
+    # fails the run at the end so they get noticed.
+    plan = {"bump": [], "issue": [], "errors": []}
+    prs = open_prs()
+    results, plan["errors"] = nvchecker_results(args.only)
+    for cp, event in sorted(results.items()):
+        try:
+            item = plan_item(cp, event, config.get(cp, {}), args, prs)
+        except Exception as e:
+            log(f"{cp}: {e}")
+            plan["errors"].append(f"{cp}: {e}")
             continue
-        else:
-            mode = args.force_mode or entry.get("x_mode", "issue")
-        if mode not in MODES:
-            sys.exit(f"{cp}: unknown x_mode {mode!r}")
-        if not args.regenerate and already_handled(cp, new, check_issues=not args.retry):
-            log(f"{cp}: {new} already has a branch, PR or issue, skipping")
-            continue
-        item = {
-            "atom": cp,
-            "old": old,
-            "new": new,
-            "mode": mode,
-            "drop_old": bool(entry.get("x_drop_old", True)),
-            "url": event.get("url") or "",
-            # For the changelog: every release since the version we have
-            "releases": releases_for(cp, entry, old.split("-r")[0], new, event.get("url"))
-            if ververify(new)
-            else [],
-            "slug": cp.replace("/", "_"),
-            "key": f"{cp.replace('/', '_')}-{new}",
-            # An open PR for an older version: build on its branch so fixes
-            # made there (by Claude or by hand) carry over
-            "base": "",
-            "base_pr": 0,
-            "base_ai": False,
-        }
-        for pr in open_prs:
-            head_repo = (pr["head"]["repo"] or {}).get("full_name")  # None for deleted forks
-            ref = pr["head"]["ref"]
-            # Regenerating starts over from main instead of this version's own PR
-            if ref.startswith(f"autobump/{cp}-") and ref != branch_name(cp, new) and head_repo == REPO:
-                item["base"] = pr["head"]["ref"]
-                item["base_pr"] = pr["number"]
-                item["base_ai"] = any(label["name"] == "ai-assisted" for label in pr["labels"])
-                log(f"{cp}: building on #{pr['number']} ({item['base']})")
-                break
-        log(f"{cp}: {old} -> {new} ({mode})")
-        plan["bump" if mode != "issue" else "issue"].append(item)
+        if item:
+            plan["bump" if item["mode"] != "issue" else "issue"].append(item)
     out = json.dumps(plan, indent=2)
     if args.output:
         Path(args.output).write_text(out)
     print(out)
+
+
+def plan_item(cp, event, entry, args, prs):
+    """What to do about cp's upstream version, None if nothing."""
+    from portage.versions import vercmp, ververify
+
+    old, _ = latest(cp)
+    new = event["version"]
+    if not ververify(new):
+        log(f"{cp}: upstream version {new!r} is not a valid Gentoo version, opening an issue")
+        mode = "issue"
+    elif vercmp(new, old.split("-r")[0]) <= 0:
+        return None
+    else:
+        mode = args.force_mode or entry.get("x_mode", "issue")
+    if mode not in MODES:
+        raise AutobumpError(f"unknown x_mode {mode!r}")
+    if not args.regenerate and already_handled(cp, new, check_issues=not args.retry):
+        log(f"{cp}: {new} already has a PR or issue, skipping")
+        return None
+    item = {
+        "atom": cp,
+        "old": old,
+        "new": new,
+        "mode": mode,
+        "drop_old": bool(entry.get("x_drop_old", True)),
+        "url": event.get("url") or "",
+        # For the changelog: every release since the version we have
+        "releases": releases_for(cp, entry, old.split("-r")[0], new, event.get("url"))
+        if ververify(new)
+        else [],
+        "slug": cp.replace("/", "_"),
+        "key": f"{cp.replace('/', '_')}-{new}",
+        # An open PR for an older version: build on its branch so fixes
+        # made there (by Claude or by hand) carry over
+        "base": "",
+        "base_pr": 0,
+        "base_ai": False,
+    }
+    for pr in prs:
+        head_repo = (pr["head"]["repo"] or {}).get("full_name")  # None for deleted forks
+        ref = pr["head"]["ref"]
+        # Regenerating starts over from main instead of this version's own PR
+        if ref.startswith(f"autobump/{cp}-") and ref != branch_name(cp, new) and head_repo == REPO:
+            item["base"] = pr["head"]["ref"]
+            item["base_pr"] = pr["number"]
+            item["base_ai"] = any(label["name"] == "ai-assisted" for label in pr["labels"])
+            log(f"{cp}: building on #{pr['number']} ({item['base']})")
+            break
+    log(f"{cp}: {old} -> {new} ({mode})")
+    return item
 
 
 # --- bump / drop ---------------------------------------------------------------
@@ -495,23 +543,27 @@ def open_issue(item, body, labels):
             "assignees": [MAINTAINER],
         },
     )
+    autobump_issues().append(issue)
     log(f"{item['atom']}: opened issue {issue['html_url']}")
     close_older_issues(item["atom"], item["new"], issue["number"])
 
 
 def close_older_issues(cp, new, number):
     """Close open autobump issues for older versions of cp, now superseded by #number."""
-    query = f'repo:{REPO} is:issue is:open label:autobump in:title "{cp}:"'
-    for issue in api("GET", f"/search/issues?q={q(query)}")["items"]:
+    for issue in autobump_issues():
         title = issue["title"]
-        if title.startswith(f"{cp}: ") and title.endswith(" available") and title != issue_title(cp, new):
-            api("POST", f"/repos/{REPO}/issues/{issue['number']}/comments", {"body": f"Superseded by #{number}."})
-            api("PATCH", f"/repos/{REPO}/issues/{issue['number']}", {"state": "closed", "state_reason": "not_planned"})
+        if (
+            issue["state"] == "open"
+            and title.startswith(f"{cp}: ")
+            and title.endswith(" available")
+            and title != issue_title(cp, new)
+        ):
+            close_issue(issue, f"Superseded by #{number}.", "not_planned")
             log(f"{cp}: closed superseded issue #{issue['number']}")
 
 
 def close_superseded(cp, branch):
-    for pr in api("GET", f"/repos/{REPO}/pulls?state=open&per_page=100") or []:
+    for pr in open_prs():
         ref = pr["head"]["ref"]
         if ref.startswith(f"autobump/{cp}-") and ref != branch:
             api("POST", f"/repos/{REPO}/issues/{pr['number']}/comments", {"body": f"Superseded by `{branch}`, which carries over the changes from this PR."})
@@ -717,8 +769,7 @@ def publish_result(result_dir, item, res):
     else:
         pr = open_pr(cp, new, branch, body, ai, draft=status == "ai")
     for issue in find_issues(cp, new, "open"):
-        api("POST", f"/repos/{REPO}/issues/{issue['number']}/comments", {"body": f"Retried in #{pr['number']}."})
-        api("PATCH", f"/repos/{REPO}/issues/{issue['number']}", {"state": "closed", "state_reason": "completed"})
+        close_issue(issue, f"Retried in #{pr['number']}.", "completed")
         log(f"{cp}: closed issue #{issue['number']}")
     close_older_issues(cp, new, pr["number"])
     close_superseded(cp, branch)
@@ -767,8 +818,11 @@ def cmd_publish(args):
         except Exception as e:
             log(f"{item['atom']}: {e}")
             failures += 1
-    if failures:
-        sys.exit(f"{failures} item(s) failed to publish")
+    # Found by check. Reported last, so they don't hold up the other packages.
+    for error in plan.get("errors", []):
+        log(f"check: {error}")
+    if failures or plan.get("errors"):
+        sys.exit(f"{failures} item(s) failed to publish, check found {len(plan.get('errors', []))} problem(s)")
 
 
 # --- main ----------------------------------------------------------------------
@@ -816,7 +870,10 @@ def main():
         args.only = None
     if getattr(args, "force_mode", None) == "":
         args.force_mode = None
-    args.func(args)
+    try:
+        args.func(args)
+    except AutobumpError as e:
+        sys.exit(f"{getattr(args, 'atom', '')}: {e}" if getattr(args, "atom", None) else str(e))
 
 
 if __name__ == "__main__":

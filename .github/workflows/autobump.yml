@@ -46,6 +46,7 @@ jobs:
       plan: ${{ steps.plan.outputs.plan }}
       bump: ${{ steps.plan.outputs.bump }}
       has_work: ${{ steps.plan.outputs.has_work }}
+      has_errors: ${{ steps.plan.outputs.has_errors }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -73,11 +74,18 @@ jobs:
             # The release list is only for publish's changelogs
             echo "bump=$(jq -c '.bump | map(del(.releases))' plan.json)"
             echo "has_work=$(jq '(.bump + .issue) | length > 0' plan.json)"
+            echo "has_errors=$(jq '.errors | length > 0' plan.json)"
           } >> "$GITHUB_OUTPUT"
           {
             echo "### New upstream versions"
             jq -r '(.bump + .issue)[] | "- `\(.atom)` \(.old) → \(.new) (\(.mode)\(if (.releases | length) > 1 then ", \(.releases | length) releases" else "" end))"' plan.json
+            if jq -e '.errors | length > 0' plan.json > /dev/null; then
+              echo
+              echo "### Problems (the run fails after publishing the rest)"
+              jq -r '.errors[] | "- \(.)"' plan.json
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.errors[] | "::error::\(.)"' plan.json
 
   bump:
     needs: check
@@ -151,7 +159,10 @@ jobs:
 
   publish:
     needs: [check, bump]
-    if: always() && needs.check.result == 'success' && needs.check.outputs.has_work == 'true' && !inputs.dry_run
+    # Also for problems found by check, to fail the run once the rest is done
+    if: >-
+      always() && needs.check.result == 'success' && !inputs.dry_run &&
+      (needs.check.outputs.has_work == 'true' || needs.check.outputs.has_errors == 'true')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/create-github-app-token@v3

@@ -17,9 +17,17 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
 
 1. **check** builds the current version of each package from the ebuild
    filenames, asks nvchecker for upstream's latest, and skips anything that
-   already has an `autobump/<cat>/<pn>-<ver>` branch, a PR (open or closed) or an
-   issue titled `<cat>/<pn>: <ver> available`. Closing a PR without merging it
-   therefore stops that version from being proposed again.
+   already has a PR (open or closed) from an `autobump/<cat>/<pn>-<ver>` branch
+   or an issue titled `<cat>/<pn>: <ver> available` (labelled `autobump`).
+   Closing a PR without merging it therefore stops that version from being
+   proposed again. A branch left without a PR (opening it failed) is bumped
+   again.
+   - A problem with one package (an nvchecker source that fails, an entry for
+     a package that's gone, an unknown `x_mode`) doesn't stop the others. It's
+     listed in the run's summary, and the run fails once everything else is
+     published, so GitHub tells you.
+   - It lists issues and PRs once per run instead of searching for each
+     package (the search API allows 30 requests a minute).
 2. **bump** (per package, up to 4 in parallel, 6 h limit) copies the latest
    ebuild to the new version, runs `pkgdev manifest` and `pkgcheck scan --exit
    error,warning,style` on the new version, and builds it with `gentoo.sh

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<upstream>
+		<remote-id type="github">brave/brave-browser</remote-id>
+		<bugs-to>https://github.com/brave/brave-browser/issues</bugs-to>
+		<changelog>https://github.com/brave/brave-browser/blob/master/CHANGELOG_DESKTOP_ORIGIN.md</changelog>
+	</upstream>
+	<longdescription>
+		Brave Origin is the Brave browser built with is_brave_origin_branded,
+		which compiles out Rewards and Brave Ads, Wallet, VPN, Leo AI, News,
+		Talk, Tor windows, Speedreader, Playlist, the Wayback Machine prompt,
+		Email Aliases, the Web Discovery Project and the daily usage ping.
+		Shields (ad and tracker blocking) is kept. P3A and crash reporting
+		are still built in but off by default. It is free on Linux and
+		installs alongside regular Brave, with its own profile in
+		~/.config/BraveSoftware/Brave-Origin.
+	</longdescription>
+	<use>
+		<flag name="telemetry">
+			Allow turning on P3A (privacy-preserving product analytics) and
+			crash reports, which are off by default. Without it, a managed
+			policy in /etc/brave/policies forces both off; every Brave build
+			on the system reads that directory, and shows itself as managed
+			by your organization.
+		</flag>
+	</use>
+</pkgmetadata>

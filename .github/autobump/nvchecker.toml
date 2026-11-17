@@ -124,6 +124,19 @@ use_latest_release = true
 prefix = "v"
 x_mode = "pr"
 
+["www-client/brave-origin-bin"]
+source = "github"
+github = "brave/brave-browser"
+# Nightly, beta and staged releases share the repo; Brave marks only the
+# promoted stable release as latest
+use_latest_release = true
+prefix = "v"
+x_mode = "pr"
+# Brave promotes a release while its checksums are still signed with the
+# pre-release key, and replaces those signatures hours later
+x_signed = ["brave-origin_{version}_amd64.deb.sha256", "brave-origin_{version}_arm64.deb.sha256"]
+x_signing_key = "https://brave-browser-downloads.s3.brave.com/keys/github-checksums-release.asc"
+
 # --- ai: patches, vendored crates or bundled deps ----------------------------
 
 ["net-vpn/proton-vpn-daemon"]

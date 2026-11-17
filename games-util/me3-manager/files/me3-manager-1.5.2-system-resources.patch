@@ -1,0 +1,17 @@
+Outside a PyInstaller bundle, resources/ (icons, translations, links) is looked
+up in the current directory, so a system install can't find it. Look in
+${prefix}/share/me3-manager first, and fall back to the current directory when
+running from a checkout.
+
+--- a/src/me3_manager/utils/resource_path.py
++++ b/src/me3_manager/utils/resource_path.py
+@@ -6,6 +6,8 @@
+     try:
+         base_path = sys._MEIPASS
+     except Exception:
+-        base_path = os.path.abspath(".")
++        base_path = os.path.join(sys.prefix, "share", "me3-manager")
++        if not os.path.isdir(os.path.join(base_path, "resources")):
++            base_path = os.path.abspath(".")
+ 
+     return os.path.join(base_path, relative_path)

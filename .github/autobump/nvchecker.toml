@@ -144,6 +144,14 @@ use_latest_release = true
 prefix = "v"
 x_mode = "pr"
 
+["games-util/me3-manager"]
+source = "github"
+github = "2Pz/me3-manager"
+use_latest_release = true
+# 1.5.2 is tagged without the v, older releases with it
+prefix = "v"
+x_mode = "pr"
+
 # --- ai: patches, vendored crates or bundled deps ----------------------------
 
 ["net-vpn/proton-vpn-daemon"]

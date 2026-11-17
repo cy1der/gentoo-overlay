@@ -1,0 +1,47 @@
+Portage installs and updates me3 and the manager on Linux: don't check either
+for updates at start, hide the install, update, change version and uninstall
+buttons (they pipe upstream's installer.sh to sh, which installs a user copy
+in ~/.local that shadows the system one), and hide the "check for ME3 updates"
+setting that no longer does anything. Windows is unchanged.
+
+--- a/src/me3_manager/ui/main_window.py
++++ b/src/me3_manager/ui/main_window.py
+@@ -166,6 +166,8 @@
+ 
+     def check_for_app_updates(self):
+         """Check for me3-manager app updates on startup."""
++        if sys.platform == "linux":
++            return
+         try:
+             self.app_update_info = self.app_update_checker.check_for_updates()
+             if self.app_update_info and self.app_update_info.get("update_available"):
+@@ -180,7 +182,7 @@
+ 
+     def check_for_me3_updates_if_enabled(self):
+         """Check for ME3 updates on startup if enabled in settings."""
+-        if not self.config_manager.get_check_for_updates():
++        if sys.platform == "linux" or not self.config_manager.get_check_for_updates():
+             return
+ 
+         if (
+--- a/src/me3_manager/ui/dialogs/help_about_dialog.py
++++ b/src/me3_manager/ui/dialogs/help_about_dialog.py
+@@ -137,6 +137,8 @@
+ 
+         if sys.platform == "win32":
+             self._setup_windows_buttons(actions_layout)
++        elif sys.platform == "linux":
++            actions_header.hide()
+         else:
+             self._setup_linux_buttons(actions_layout)
+ 
+--- a/src/me3_manager/ui/dialogs/settings_dialog.py
++++ b/src/me3_manager/ui/dialogs/settings_dialog.py
+@@ -213,6 +213,7 @@
+         )
+         self.check_updates_checkbox.toggled.connect(self.on_check_updates_toggled)
+         layout.addWidget(self.check_updates_checkbox)
++        self.check_updates_checkbox.setVisible(sys.platform != "linux")
+ 
+         # Check for mod updates checkbox (Nexus)
+         self.check_mod_updates_checkbox = QCheckBox(

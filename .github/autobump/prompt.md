@@ -47,6 +47,11 @@ Rules:
 - Never weaken the package to get it building: no `RESTRICT=test` unless the
   {{OLD}} ebuild already had it, no disabling features or USE flags, no dropping
   `KEYWORDS`. If it can't be done properly, stop and say why.
+- Never get past a failed signature or checksum check: don't change how
+  `verify-sig` verifies, the key it uses (`VERIFY_SIG_OPENPGP_KEY_PATH`, the
+  `sec-keys/*` dependency) or the fingerprints of a `sec-keys` package. It can
+  mean a tampered download or a new upstream key, which a person has to check.
+  Stop and say which file failed and what gpg reported.
 - The {{NEW}} ebuild must have no `error`, `warning` or `style` pkgcheck
   findings. Fix them in the {{NEW}} ebuild even if {{OLD}} has them too
   (`info` findings such as `PythonCompatUpdate` are fine).

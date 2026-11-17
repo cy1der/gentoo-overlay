@@ -5,6 +5,9 @@
 #   x_mode     "pr" (mechanical bump, falls back to Claude), "ai" (Claude
 #              does the bump), or "issue" (only open an issue). Default: "issue"
 #   x_drop_old drop the previous ebuild in a second commit. Default: true
+#   x_signed   GitHub release assets ({version} is replaced) whose detached
+#              .asc signature must verify against x_signing_key (a URL)
+#              before the version is bumped
 
 # --- pr: mechanical bumps ---------------------------------------------------
 

@@ -28,11 +28,20 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
      published, so GitHub tells you.
    - It lists issues and PRs once per run instead of searching for each
      package (the search API allows 30 requests a minute).
+   - For entries with `x_signed`, it waits until those release assets have a
+     valid signature by `x_signing_key` (see
+     [Configuring packages](#configuring-packages)). After 72 hours without
+     one, the package is reported as a problem instead. The hours count from
+     when the release was published, so one that was staged as a
+     pre-release for longer can trip this for a run before it's re-signed.
 2. **bump** (per package, up to 4 in parallel, 6 h limit) copies the latest
    ebuild to the new version, runs `pkgdev manifest` and `pkgcheck scan --exit
    error,warning,style` on the new version, and builds it with `gentoo.sh
    build`. That installs only what building it needs (`DEPEND`, `BDEPEND`,
-   `IDEPEND`), then builds the package itself with its default USE flags. Its
+   `IDEPEND`), then builds the package itself with its default USE flags plus
+   `verify-sig`, so upstream's signatures are checked against the overlay's
+   `sec-keys` packages (only for the package itself: ::gentoo binpkgs are
+   built without it, and wouldn't be used with it). Its
    runtime-only dependencies are left out, so a GUI app doesn't compile a
    toolkit it only uses at run time, and a build that needs something only
    listed in `RDEPEND` fails, as it should (it belongs in `BDEPEND`).
@@ -132,6 +141,23 @@ Use `from_pattern`/`to_pattern` when upstream versions don't map 1:1 to a
 Gentoo version (e.g. `1.0b1` → `1.0_beta1`). Versions that still aren't valid
 Gentoo versions become issues.
 
+When upstream publishes a release before its signatures are final (Brave
+signs with a pre-release key first and replaces the `.asc` files hours
+later), a bump in between pins files that are about to change. List those
+assets in `x_signed`, and check only proposes the version once each one's
+`<asset>.asc` verifies against the keys at `x_signing_key`. It needs
+`source = "github"`:
+
+```toml
+x_signed = ["foo_{version}_amd64.deb.sha256"]   # {version} is the new version
+x_signing_key = "https://example.com/release-keys.asc"
+```
+
+This only decides when to bump. The build verifies the files against the
+overlay's own `sec-keys` package, which a person updates when upstream's keys
+change: give that package `x_mode = "issue"` (see
+`sec-keys/openpgp-keys-brave`).
+
 `python3 .github/autobump/autobump.py lint` checks the file against the
 overlay. It reports as errors: entries for packages that are gone, unknown
 `x_mode` values, `x_` keys it doesn't know (typos) and entries without a
@@ -186,6 +212,9 @@ check runs it daily, so changes pushed straight to `main` are caught too.
 - `main` should have a ruleset that only lets the repository admin update it,
   so neither the bot nor `@claude` can push there directly; they can only
   open PRs.
+- Claude is told never to get past a failed signature or checksum check by
+  changing `verify-sig`, the key it uses or a `sec-keys` package's
+  fingerprints. Check that in any `ai-assisted` PR that touches them.
 - Claude runs with a fixed tool allowlist and only receives the OAuth token in
   its own process. Builds that Claude starts itself inherit Claude's
   environment. Setting `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` on the `claude`

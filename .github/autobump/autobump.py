@@ -26,6 +26,7 @@ import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -329,6 +330,82 @@ def cmd_check(args):
     print(out)
 
 
+# How long check waits for a release's x_signed signatures before it reports
+# the package instead
+SIGNATURE_WAIT_HOURS = 72
+
+
+def github_release(event):
+    """(owner/repo, tag) of the GitHub release nvchecker found."""
+    match = re.fullmatch(r"https://github\.com/([^/]+/[^/]+)/releases/tag/(.+)", event.get("url") or "")
+    if not match:
+        raise AutobumpError(f"x_signed needs a GitHub release, nvchecker found {event.get('url')!r}")
+    return match[1], urllib.parse.unquote(match[2])
+
+
+def download(url, dest):
+    """Save url to dest, False if it doesn't exist (yet)."""
+    try:
+        with urllib.request.urlopen(url, timeout=60) as resp:
+            dest.write_bytes(resp.read())
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return False
+        raise AutobumpError(f"{url}: {e.code}") from e
+    except urllib.error.URLError as e:
+        raise AutobumpError(f"{url}: {e.reason}") from e
+    return True
+
+
+def signed(entry, event):
+    """Whether each x_signed asset of the release has a valid detached
+    signature (<asset>.asc) by a key in x_signing_key.
+
+    Brave, for one, marks a release as latest while its assets are still
+    signed with its pre-release key, and replaces the signatures hours later.
+    A bump in between pins files that are about to change, and fails
+    verify-sig. This only decides when to bump: CI and users verify against
+    the overlay's own sec-keys package.
+    """
+    repo, tag = github_release(event)
+    base = f"https://github.com/{repo}/releases/download/{q(tag)}"
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        if not download(entry["x_signing_key"], tmp / "keys.asc"):
+            raise AutobumpError(f"{entry['x_signing_key']}: not found")
+        # gpgv needs a binary keyring, and unlike gpg starts no agent
+        try:
+            with open(tmp / "keys.asc", "rb") as armored, open(tmp / "keys.gpg", "wb") as keyring:
+                subprocess.run(["gpg", "--batch", "--homedir", str(tmp), "--dearmor"], stdin=armored, stdout=keyring,
+                               stderr=subprocess.PIPE, check=True)
+        except FileNotFoundError as e:
+            raise AutobumpError("x_signed needs gpg") from e
+        except subprocess.CalledProcessError as e:
+            raise AutobumpError(f"{entry['x_signing_key']}: {e.stderr.decode().strip()}") from e
+        for template in entry["x_signed"]:
+            name = template.format(version=event["version"])
+            asset, sig = tmp / "asset", tmp / "asset.asc"
+            if not (download(f"{base}/{q(name)}", asset) and download(f"{base}/{q(name)}.asc", sig)):
+                log(f"{name} or its signature isn't uploaded yet")
+                return False
+            proc = subprocess.run(["gpgv", "--homedir", str(tmp), "--keyring", str(tmp / "keys.gpg"), str(sig), str(asset)],
+                                  capture_output=True, text=True)
+            if proc.returncode:
+                log(f"{name}.asc: {proc.stderr.strip().splitlines()[-1] if proc.stderr.strip() else 'bad signature'}")
+                return False
+    return True
+
+
+def release_age(event):
+    """Hours since the release nvchecker found was published."""
+    repo, tag = github_release(event)
+    release = api("GET", f"/repos/{repo}/releases/tags/{q(tag)}")
+    if not release:
+        raise AutobumpError(f"{repo}: no release {tag}")
+    published = datetime.fromisoformat(release["published_at"].replace("Z", "+00:00"))
+    return (datetime.now(timezone.utc) - published).total_seconds() / 3600
+
+
 def plan_item(cp, event, entry, args, prs):
     """What to do about cp's upstream version, None if nothing."""
     from portage.versions import vercmp, ververify
@@ -347,6 +424,12 @@ def plan_item(cp, event, entry, args, prs):
     if not args.regenerate and already_handled(cp, new, check_issues=not args.retry):
         log(f"{cp}: {new} already has a PR or issue, skipping")
         return None
+    if entry.get("x_signed") and ververify(new) and not signed(entry, event):
+        hours = release_age(event)
+        if hours < SIGNATURE_WAIT_HOURS:
+            log(f"{cp}: {new} isn't signed by x_signing_key yet ({hours:.0f} hours old), waiting")
+            return None
+        raise AutobumpError(f"{new} still isn't signed by x_signing_key after {hours:.0f} hours")
     item = {
         "atom": cp,
         "old": old,
@@ -383,7 +466,7 @@ def plan_item(cp, event, entry, args, prs):
 # --- lint ----------------------------------------------------------------------
 
 # Our own keys in nvchecker.toml, which nvchecker ignores
-OWN_KEYS = {"x_mode", "x_drop_old"}
+OWN_KEYS = {"x_mode", "x_drop_old", "x_signed", "x_signing_key"}
 
 
 def lint():
@@ -409,12 +492,33 @@ def lint():
             errors.append(f"{cp}: unknown x_mode {entry['x_mode']!r}, use one of {', '.join(MODES)}")
         if not isinstance(entry.get("x_drop_old", True), bool):
             errors.append(f"{cp}: x_drop_old must be true or false")
+        if "x_signed" in entry or "x_signing_key" in entry:
+            errors += [f"{cp}: {e}" for e in lint_signed(entry)]
         for key in sorted(entry):
             if key.startswith("x_") and key not in OWN_KEYS:
                 errors.append(f"{cp}: unknown key {key}, use one of {', '.join(sorted(OWN_KEYS))}")
     for cp in sorted(packages - set(config)):
         warnings.append(f"{cp}: not in {CONFIG.name}, so autobump doesn't check it")
     return errors, warnings
+
+
+def lint_signed(entry):
+    signed_assets, key = entry.get("x_signed"), entry.get("x_signing_key")
+    if signed_assets is None or key is None:
+        return ["x_signed and x_signing_key go together"]
+    errors = []
+    if entry.get("source") != "github":
+        errors.append("x_signed only works with source = \"github\"")
+    if not isinstance(key, str) or not key.startswith("https://"):
+        errors.append("x_signing_key must be an https:// URL")
+    if not signed_assets or not isinstance(signed_assets, list) or not all(isinstance(a, str) for a in signed_assets):
+        return errors + ["x_signed must be a list of asset names"]
+    for asset in signed_assets:
+        try:
+            asset.format(version="1")
+        except (KeyError, IndexError, ValueError):
+            errors.append(f"x_signed: {asset!r} can only use {{version}}")
+    return errors
 
 
 def cmd_lint(args):

@@ -39,7 +39,7 @@ setup() {
 		CONFIG_PROTECT_MASK="/etc/portage"
 		EMERGE_DEFAULT_OPTS="--quiet-build=y --autounmask-continue=y --autounmask-keep-keywords=n"
 	EOF
-	mkdir -p /etc/portage/repos.conf /etc/portage/package.accept_keywords
+	mkdir -p /etc/portage/repos.conf /etc/portage/package.accept_keywords /etc/portage/package.use
 	# pkgcore ignores portage's built-in default once /etc/portage/repos.conf exists
 	printf '[DEFAULT]\nmain-repo = gentoo\n\n[gentoo]\nlocation = /var/db/repos/gentoo\n' \
 		> /etc/portage/repos.conf/gentoo.conf
@@ -70,13 +70,17 @@ prune() {
 }
 
 # Sets the caller's opts to the emerge options for the =atom $1: never reuse a
-# binpkg of the package under test, always build it.
+# binpkg of the package under test, always build it. Also turns on verify-sig
+# for it (off by default), so a bump proves upstream's signatures. Not for
+# everything: binpkgs built without the flag would no longer match, and their
+# packages would be compiled instead.
 # Every command needs "|| return 1": set -e is off when called from an if.
 pkg_opts() {
 	local cp
 	cp=$(python3 -c 'import sys; from portage.versions import cpv_getkey; print(cpv_getkey(sys.argv[1].lstrip("=")))' "$1") \
 		|| return 1
 	opts=(--oneshot --usepkg-exclude "${cp}" --buildpkg-exclude "${cp}")
+	echo "${cp} verify-sig" > /etc/portage/package.use/zz-under-test || return 1
 }
 
 # Installs only what building and installing one version needs (DEPEND,

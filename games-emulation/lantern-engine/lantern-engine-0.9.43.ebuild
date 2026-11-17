@@ -195,6 +195,10 @@ src_prepare() {
 
 	cmake_src_prepare
 
+	# Retired upstream and unused, but still globbed into the launcher; it no longer compiles
+	# since LauncherSettings.OnlinePassword was removed
+	rm launcher/windows/BloodborneLauncher/Core/SuperMedo.cs || die
+
 	use gui && nuget_writeconfig "${S}"/launcher/windows/
 }
 

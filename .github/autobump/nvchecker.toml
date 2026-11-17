@@ -137,6 +137,13 @@ x_mode = "pr"
 x_signed = ["brave-origin_{version}_amd64.deb.sha256", "brave-origin_{version}_arm64.deb.sha256"]
 x_signing_key = "https://brave-browser-downloads.s3.brave.com/keys/github-checksums-release.asc"
 
+["games-util/me3-bin"]
+source = "github"
+github = "garyttierney/me3"
+use_latest_release = true
+prefix = "v"
+x_mode = "pr"
+
 # --- ai: patches, vendored crates or bundled deps ----------------------------
 
 ["net-vpn/proton-vpn-daemon"]

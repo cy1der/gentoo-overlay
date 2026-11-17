@@ -52,7 +52,13 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
    - If that fails, or the package is `x_mode = "ai"`, Claude Code edits the
      new ebuild (deps, patches, `CRATES`, ...). The workflow re-runs pkgcheck
      and emerge after each round; Claude saying it's done isn't enough. Each
-     round is stopped after `CLAUDE_ROUND_MINUTES` (60).
+     round is stopped after `CLAUDE_ROUND_MINUTES` (60). A single Bash command
+     may run that long too (`BASH_DEFAULT_TIMEOUT_MS`/`BASH_MAX_TIMEOUT_MS`),
+     so Claude waits for a long build in the foreground. Claude Code's 10
+     minute default made it restart builds that were still running.
+   - The prompt lists the commands Claude may run (from `CLAUDE_TOOLS`) and
+     the shapes the permission check denies (shell variables, `$(...)`,
+     unquoted `=atoms`, `cd` before `git`).
    - Before Claude starts, the package's build-time dependencies are installed
      (`gentoo.sh deps`), so its toolchain (Rust, Go, .NET, ...) is there and
      Claude can unpack and compare both versions. Nothing is set up per

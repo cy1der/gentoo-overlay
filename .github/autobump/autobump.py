@@ -594,12 +594,17 @@ def cmd_prompt(args):
             "(Rust, Go, .NET, Python, ...) is there and `ebuild <file> unpack` works "
             "for both versions."
         )
+    # The shell commands in Claude's --allowedTools, e.g. Bash(pkgcheck:*).
+    # The relative gentoo.sh rules only catch calls without the full path.
+    commands = [c.removesuffix(":*") for c in re.findall(r"Bash\(([^)]*)\)", args.tools or "")]
+    commands = [c for c in commands if not c.startswith(".github/")]
     for key, value in {
         "ATOM": args.atom,
         "OLD": args.old,
         "NEW": args.new,
         "URL": args.url or "(none)",
         "ROUND_MINUTES": str(args.round_minutes),
+        "COMMANDS": ", ".join(f"`{c}`" for c in commands) or "(the ones in your tool list)",
         "DEPS": deps,
         "FAILURE": failure or "(not built yet)",
     }.items():
@@ -616,6 +621,10 @@ def cmd_transcript(args):
     Writes Claude's final message (and anything that isn't JSON, such as
     errors) to `text`, appends the commands it was denied to `denied`, and
     prints a one-line status for the step log.
+
+    A round has one result event per stretch of work: when a background
+    command finishes after Claude has replied, Claude carries on and reports
+    again. Each event only covers its own stretch, so they all count.
     """
     raw = Path(args.jsonl).read_text(errors="replace")
     # The transcript is uploaded as an artifact, where GitHub doesn't mask secrets
@@ -623,7 +632,7 @@ def cmd_transcript(args):
     if len(secret) >= 8 and secret in raw:
         raw = raw.replace(secret, "[REDACTED]")
         Path(args.jsonl).write_text(raw)
-    result, other = None, []
+    results, other = [], []
     for line in raw.splitlines():
         try:
             event = json.loads(line)
@@ -632,28 +641,30 @@ def cmd_transcript(args):
                 other.append(line)
             continue
         if isinstance(event, dict) and event.get("type") == "result":
-            result = event
+            results.append(event)
     denied = []
-    for denial in (result or {}).get("permission_denials") or []:
+    for denial in (d for result in results for d in result.get("permission_denials") or []):
         if not isinstance(denial, dict):
             denied.append(str(denial))
             continue
         tool_input = denial.get("tool_input") if isinstance(denial.get("tool_input"), dict) else {}
         what = tool_input.get("command") or tool_input.get("file_path") or tool_input.get("url") or json.dumps(tool_input)
         denied.append(f"{denial.get('tool_name', '?')}: {what}")
-    text = (result or {}).get("result") or "(no result)"
-    Path(args.text).write_text(text.rstrip() + ("\n\n" + "\n".join(other) if other else "") + "\n")
+    messages = [result["result"].strip() for result in results if (result.get("result") or "").strip()]
+    text = "\n\n---\n\n".join(messages) or "(no result)"
+    Path(args.text).write_text(text + ("\n\n" + "\n".join(other) if other else "") + "\n")
     if denied:
         with open(args.denied, "a") as f:
             f.writelines(" ".join(d.split())[:300] + "\n" for d in denied)
-    if not result:
+    if not results:
         print("no result" + (f": {other[-1][:200]}" if other else ""))
         return
-    status = f"{result.get('num_turns', '?')} turns"
-    if result.get("subtype") == "error_max_turns":
+    turns = sum(result.get("num_turns") or 0 for result in results)
+    status = f"{turns} turns" + (f" in {len(results)} stretches" if len(results) > 1 else "")
+    if any(result.get("subtype") == "error_max_turns" for result in results):
         status += ", stopped at the turn limit"
-    elif result.get("is_error"):
-        status += f", {result.get('subtype') or 'error'}"
+    elif results[-1].get("is_error"):
+        status += f", {results[-1].get('subtype') or 'error'}"
     if denied:
         status += f", {len(denied)} command(s) denied"
     print(status)
@@ -1127,6 +1138,7 @@ def main():
     p.add_argument("--log", help="build log of the failed attempt")
     p.add_argument("--deps-log", help="log of a failed attempt to install the build-time dependencies")
     p.add_argument("--round-minutes", type=int, default=60, help="time limit of each Claude round")
+    p.add_argument("--tools", help="Claude's --allowedTools, to list the commands it may run")
     p.set_defaults(func=cmd_prompt)
 
     p = sub.add_parser("publish")

@@ -21,7 +21,7 @@ CLAUDE_MAX_TURNS=${CLAUDE_MAX_TURNS:-80}
 # BUDGET_MINUTES (set by autobump.yml, no limit when unset).
 CLAUDE_ROUND_MINUTES=${CLAUDE_ROUND_MINUTES:-60}
 export PATH="${HOME}/.local/bin:${PATH}"
-CLAUDE_TOOLS="Read,Edit,Write,Glob,Grep,WebFetch,Bash(${SELF} build:*),Bash(${SELF} deps:*),Bash(ebuild:*),Bash(emerge:*),Bash(pkgdev:*),Bash(pkgcheck:*),Bash(pycargoebuild:*),Bash(python3:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(diff:*),Bash(tar:*),Bash(ls:*),Bash(find:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*)"
+CLAUDE_TOOLS="Read,Edit,Write,Glob,Grep,WebFetch,Bash(${SELF} build:*),Bash(${SELF} deps:*),Bash(.github/autobump/gentoo.sh build:*),Bash(.github/autobump/gentoo.sh deps:*),Bash(ebuild:*),Bash(emerge:*),Bash(pkgdev:*),Bash(pkgcheck:*),Bash(pycargoebuild:*),Bash(python3:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(diff:*),Bash(tar:*),Bash(ls:*),Bash(find:*),Bash(grep:*),Bash(cat:*),Bash(head:*),Bash(tail:*)"
 
 setup() {
 	# A restored actions/cache belongs to the runner user, but portage and
@@ -249,7 +249,13 @@ claude_round() {
 	# The whole transcript, with every command Claude ran and what it got back
 	args+=(--output-format stream-json --verbose)
 	local rc=0 out=${OUT}/claude-round-${round}
-	(cd "${OVERLAY}" && CLAUDE_CODE_OAUTH_TOKEN=${claude_token} limited "$((CLAUDE_ROUND_MINUTES * 60))" claude "${args[@]}") \
+	# A Bash command may take the whole round, so Claude can wait for a build
+	# in the foreground. By default it gets 10 minutes, after which the command
+	# moves to the background, where -p runs stop it 10 minutes later, and
+	# Claude ends up restarting builds that are still running.
+	local bash_ms=$((CLAUDE_ROUND_MINUTES * 60 * 1000))
+	(cd "${OVERLAY}" && CLAUDE_CODE_OAUTH_TOKEN=${claude_token} BASH_DEFAULT_TIMEOUT_MS=${bash_ms} \
+		BASH_MAX_TIMEOUT_MS=${bash_ms} limited "$((CLAUDE_ROUND_MINUTES * 60))" claude "${args[@]}") \
 		> "${out}.jsonl" 2>&1 || rc=$?
 	stop_strays
 	# Claude's final message to claude-round-N.txt, the commands it wasn't
@@ -320,7 +326,7 @@ job() {
 			rc=0
 			if ((round == 1)); then
 				"${AUTOBUMP[@]}" prompt "${cp}" "${old}" "${new}" --round-minutes "${CLAUDE_ROUND_MINUTES}" \
-					"${prompt_args[@]}" | claude_round 1 || rc=$?
+					--tools "${CLAUDE_TOOLS}" "${prompt_args[@]}" | claude_round 1 || rc=$?
 			else
 				{
 					echo "Verification failed again. Fix it and update .autobump-out/ai-summary.md."

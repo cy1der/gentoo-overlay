@@ -9,8 +9,8 @@ regenerate the Manifest (and, unless noted below, to build it).
 {{DEPS}}
 
 Your job is to make `{{ATOM}}-{{NEW}}` pass
-`pkgcheck scan --exit error,warning,style -- ={{ATOM}}-{{NEW}}` and build with
-`/overlay/.github/autobump/gentoo.sh build ={{ATOM}}-{{NEW}}`.
+`pkgcheck scan --exit error,warning,style -- '={{ATOM}}-{{NEW}}'` and build with
+`/overlay/.github/autobump/gentoo.sh build '={{ATOM}}-{{NEW}}'`.
 
 Read `CLAUDE.md` and `CONTRIBUTING.md` first and follow them.
 
@@ -31,7 +31,7 @@ How to approach it:
    `${PN}-{{NEW}}-<desc>.patch`. Refer to patches with a literal version
    (`"${FILESDIR}"/${PN}-1.2.3-desc.patch`), never `${P}` or `${PV}`.
 5. Regenerate the Manifest with `pkgdev manifest` from the package directory.
-6. Build with `/overlay/.github/autobump/gentoo.sh build ={{ATOM}}-{{NEW}}` and
+6. Build with `/overlay/.github/autobump/gentoo.sh build '={{ATOM}}-{{NEW}}'` and
    iterate until it builds and pkgcheck is clean. That is how the workflow
    verifies it: it installs only the build-time dependencies (`DEPEND`,
    `BDEPEND`, `IDEPEND`), then the package without its runtime-only ones. Don't
@@ -39,7 +39,25 @@ How to approach it:
    the build needs something that is only in `RDEPEND`, add it to `BDEPEND`.
    To install the build-time dependencies without building the package (e.g.
    after adding some), run
-   `/overlay/.github/autobump/gentoo.sh deps ={{ATOM}}-{{NEW}}`.
+   `/overlay/.github/autobump/gentoo.sh deps '={{ATOM}}-{{NEW}}'`.
+
+Running commands. This run is unattended: nobody approves commands, so a
+denied command stays denied, and each denial costs you a turn.
+- Bash may only run these commands: {{COMMANDS}}. Every part of a command
+  (after `&&`, `;` or `|`) has to be one of them.
+- The permission check denies what it can't verify. Write literal absolute
+  paths: no shell variables (`W=/var/tmp/...; ls $W`) or loops over them, no
+  `$(...)` and no `<(...)`.
+- Quote atoms (`'={{ATOM}}-{{NEW}}'`). An unquoted `=` at the start of a word is
+  denied, because it looks like zsh's `=cmd` expansion.
+- Run `git` from `/overlay` itself. A command that changes directory and then
+  runs `git` is denied.
+- Write scripts with the Write tool into `.autobump-out/`, which already
+  exists, and run them with `python3 .autobump-out/<name>.py`.
+- A build can take the whole round. Run `gentoo.sh build` in the foreground,
+  with the Bash timeout set to up to {{ROUND_MINUTES}} minutes. Don't start it
+  in the background, and never start a second build while one is running:
+  they share portage's locks and the workdir.
 
 Rules:
 - Only change files under `{{ATOM}}/`. Changes anywhere else are discarded.
@@ -65,8 +83,6 @@ Rules:
   a dependency can't be installed because of its `REQUIRED_USE`, that's the
   container, not the ebuild: don't add USE dependencies the package doesn't
   need (such as `net-libs/webkit-gtk[X]`). Report it in your summary instead.
-- This run is unattended: nobody approves commands, so a denied command stays
-  denied. Find another way with the allowed tools, or report it.
 - Each round is stopped after {{ROUND_MINUTES}} minutes, and the workflow
   builds the package again after it. Don't wait for dependencies that take
   hours to compile (such as webkit-gtk, qtwebengine or llvm): stop and say so

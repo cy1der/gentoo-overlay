@@ -238,8 +238,8 @@ CRATES="
 	rustix@1.1.4
 	rustls-pemfile@2.2.0
 	rustls-pki-types@1.14.0
-	rustls-webpki@0.103.13
-	rustls@0.23.39
+	rustls-webpki@0.103.16
+	rustls@0.23.46
 	rustversion@1.0.22
 	ryu@1.0.23
 	same-file@1.0.6
@@ -390,10 +390,10 @@ CRATES="
 PROTON_CRATES="
 	proton-boringtun@3.0.0
 	proton-os-interface@0.2.6
-	proton-pfff@0.13.0
 	proton-pfff-config@0.1.0
 	proton-pfff-core@0.1.2
 	proton-pfff-module@0.8.6
+	proton-pfff@0.13.0
 	proton-tls-parser@0.4.0
 	proton-vpn-binary-status@3.0.0
 	proton-vpn-haproxyv2@0.1.0

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<longdescription>
+		The release-channel keys Brave Software uses to sign the .sha256
+		files published next to each release on GitHub, used by verify-sig
+		in www-client/brave-origin-bin.
+	</longdescription>
+</pkgmetadata>

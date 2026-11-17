@@ -215,3 +215,10 @@ include_regex = '^v\d+(\.\d+)*$'
 prefix = "v"
 # Packaged from a snapshot newer than the last tag; a new tag still needs a look
 x_mode = "issue"
+
+["sec-keys/openpgp-keys-brave"]
+# The newest key or signature in the (unversioned) key file, as YYYYMMDD
+source = "cmd"
+cmd = "wget -qO- https://brave-browser-downloads.s3.brave.com/keys/github-checksums-release.asc | gpg --batch --list-packets | grep -oE 'created [0-9]+' | cut -d' ' -f2 | sort -n | tail -n 1 | xargs -I{} date -u -d @{} +%Y%m%d"
+# A new key has to be checked against https://brave.com/signing-keys/ by hand
+x_mode = "issue"

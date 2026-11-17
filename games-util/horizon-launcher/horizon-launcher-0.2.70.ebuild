@@ -22,6 +22,7 @@ CRATES="
 	aligned-vec@0.6.4
 	aligned@0.4.3
 	allocator-api2@0.2.21
+	ambient-authority@0.0.2
 	android_system_properties@0.1.6
 	anstream@1.0.0
 	anstyle-parse@1.0.0
@@ -82,6 +83,9 @@ CRATES="
 	bytes@1.12.1
 	calloop-wayland-source@0.4.1
 	calloop@0.14.5
+	cap-fs-ext@3.4.6
+	cap-primitives@3.4.6
+	cap-std@3.4.6
 	cbc@0.1.2
 	cbindgen@0.28.0
 	cc@1.8.0
@@ -193,6 +197,7 @@ CRATES="
 	form_urlencoded@1.2.2
 	framehop@0.16.0
 	freetype-sys@0.20.1
+	fs-set-times@0.20.3
 	futures-channel@0.3.34
 	futures-core@0.3.34
 	futures-executor@0.3.34
@@ -274,6 +279,7 @@ CRATES="
 	icu_provider@2.4.0
 	icu_segmenter@2.4.0
 	icu_segmenter_data@2.4.0
+	id-arena@2.3.0
 	idna@1.1.0
 	idna_adapter@1.2.2
 	if-addrs@0.15.0
@@ -285,6 +291,8 @@ CRATES="
 	inout@0.1.4
 	interpolate_name@0.2.4
 	inventory@0.3.25
+	io-extras@0.18.4
+	io-lifetimes@2.0.4
 	ipconfig@0.3.4
 	ipnet@2.12.2
 	is-docker@0.2.0
@@ -334,6 +342,7 @@ CRATES="
 	mac-notification-sys@0.6.15
 	mach2@0.6.0
 	malloc_buf@0.0.6
+	maybe-owned@0.3.4
 	maybe-rayon@0.1.1
 	md-5@0.10.6
 	memchr@2.8.3
@@ -407,6 +416,7 @@ CRATES="
 	option-ext@0.2.0
 	ordered-float@5.5.1
 	ordered-stream@0.2.0
+	os_pipe@1.2.3
 	parking@2.2.1
 	parking_lot@0.12.5
 	parking_lot_core@0.9.12
@@ -417,9 +427,13 @@ CRATES="
 	pbkdf2@0.12.2
 	percent-encoding@2.3.2
 	petgraph@0.8.3
+	phf@0.11.3
 	phf@0.13.1
+	phf_codegen@0.11.3
+	phf_generator@0.11.3
 	phf_generator@0.13.1
 	phf_macros@0.13.1
+	phf_shared@0.11.3
 	phf_shared@0.13.1
 	pico-args@0.5.0
 	pin-project-internal@1.1.13
@@ -504,6 +518,7 @@ CRATES="
 	rustc-hash@1.1.0
 	rustc-hash@2.1.3
 	rustc_version@0.4.1
+	rustix-linux-procfs@0.1.1
 	rustix@1.1.5
 	rustls-pki-types@1.15.1
 	rustls-webpki@0.103.16
@@ -632,6 +647,8 @@ CRATES="
 	unicode-vo@0.1.0
 	unicode-width@0.1.14
 	unicode-width@0.2.2
+	unicode_names2@2.0.0
+	unicode_names2_generator@2.0.0
 	universal-hash@0.5.1
 	untrusted@0.9.0
 	ureq@2.12.1
@@ -657,7 +674,7 @@ CRATES="
 	wasm-bindgen@0.2.129
 	wasm-streams@0.4.2
 	wasm_thread@0.3.3
-	wasmparser@0.254.2
+	wasmparser@0.261.0
 	wayland-backend@0.3.17
 	wayland-client@0.31.15
 	wayland-cursor@0.31.14
@@ -748,8 +765,10 @@ CRATES="
 	winnow@1.0.4
 	winreg@0.56.0
 	winresource@0.1.34
+	winx@0.36.4
 	wio@0.2.2
 	wit-bindgen@0.57.1
+	wit-parser@0.261.0
 	writeable@0.6.4
 	x11@2.21.0
 	x11rb-protocol@0.13.2
@@ -763,6 +782,7 @@ CRATES="
 	xml-rs@0.8.29
 	xmlwriter@0.1.0
 	xxhash-rust@0.8.19
+	xz4rust@0.2.3
 	y4m@0.8.0
 	yazi@0.2.1
 	yeslogic-fontconfig-sys@6.0.1
@@ -819,8 +839,9 @@ S="${WORKDIR}/${P}/launcher"
 LICENSE="CC-BY-4.0 LGPL-3+ MIT OFL-1.1"
 # Dependent crate licenses
 LICENSE+="
-	Apache-2.0 BSD-2 BSD Boost-1.0 CC0-1.0 CDLA-Permissive-2.0 ISC MIT
-	MPL-2.0 UoI-NCSA Unicode-3.0 ZLIB
+	Apache-2.0 Apache-2.0-with-LLVM-exceptions BSD-2 BSD Boost-1.0
+	CC0-1.0 CDLA-Permissive-2.0 ISC MIT MPL-2.0 UoI-NCSA Unicode-3.0
+	Unicode-DFS-2016 ZLIB
 "
 SLOT="0"
 KEYWORDS="~amd64"

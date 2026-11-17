@@ -680,6 +680,33 @@ def tail(path, lines=60, chars=10000):
     return "\n".join(path.read_text(errors="replace").splitlines()[-lines:])[-chars:]
 
 
+def nest_headings(markdown, level=3):
+    """Shift the headings of markdown so the biggest is `level` (### by
+    default), keeping their relative sizes. Code blocks are left alone."""
+    heading = re.compile(r"( {0,3})(#{1,6})(?=\s|$)")
+    fence_open = re.compile(r" {0,3}(`{3,}|~{3,})")
+    lines = markdown.splitlines(keepends=True)
+    headings, fence = [], None
+    for i, line in enumerate(lines):
+        m = fence_open.match(line)
+        if fence:
+            if m and m[1][0] == fence[0] and len(m[1]) >= len(fence) and not line.strip(" \n`~"):
+                fence = None
+        elif m:
+            fence = m[1]
+        elif heading.match(line):
+            headings.append(i)
+    if not headings:
+        return markdown
+    shift = level - min(len(heading.match(lines[i])[2]) for i in headings)
+    if shift <= 0:
+        return markdown
+    for i in headings:
+        m = heading.match(lines[i])
+        lines[i] = m[1] + "#" * min(6, len(m[2]) + shift) + lines[i][m.end() :]
+    return "".join(lines)
+
+
 def details(summary, body, lang="", markdown=False):
     if not body.strip():
         return ""
@@ -952,6 +979,8 @@ def publish_result(result_dir, item, res):
     # Changes carried over from an ai-assisted PR still need a careful review
     ai = status == "ai" or (status != "failed" and item.get("base_ai", False))
     ai_summary = (result_dir / "ai-summary.md").read_text() if (result_dir / "ai-summary.md").exists() else ""
+    # It goes under a "## Claude's summary" heading
+    ai_summary = nest_headings(ai_summary)
     denied = denied_commands(result_dir)
     pkgcheck = tail(result_dir / "pkgcheck.txt", 40)
     build = tail(result_dir / "build.log", 60)

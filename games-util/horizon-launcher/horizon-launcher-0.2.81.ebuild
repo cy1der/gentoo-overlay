@@ -21,9 +21,11 @@ CRATES="
 	aho-corasick@1.1.5
 	aligned-vec@0.6.4
 	aligned@0.4.3
+	alloca@0.4.0
 	allocator-api2@0.2.21
 	ambient-authority@0.0.2
 	android_system_properties@0.1.6
+	anes@0.1.6
 	anstream@1.0.0
 	anstyle-parse@1.0.0
 	anstyle-query@1.1.5
@@ -51,6 +53,7 @@ CRATES="
 	async-task@4.7.1
 	async-trait@0.1.92
 	atomic-waker@1.1.2
+	atomic@0.5.3
 	atspi-common@0.13.0
 	atspi-proxies@0.13.0
 	atspi@0.29.0
@@ -63,6 +66,8 @@ CRATES="
 	base64@0.23.1
 	beef@0.5.2
 	bit-set@0.10.0
+	bit-set@0.11.1
+	bit-vec@0.10.2
 	bit-vec@0.9.1
 	bit_field@0.10.3
 	bitflags@1.3.2
@@ -74,6 +79,8 @@ CRATES="
 	block2@0.6.2
 	block@0.1.6
 	blocking@1.7.0
+	borsh-derive@1.8.1
+	borsh@1.8.1
 	built@0.8.1
 	bumpalo@3.20.3
 	bytemuck@1.25.2
@@ -81,11 +88,13 @@ CRATES="
 	byteorder-lite@0.1.0
 	byteorder@1.5.0
 	bytes@1.12.1
+	c-enum@0.2.3
 	calloop-wayland-source@0.4.1
 	calloop@0.14.5
 	cap-fs-ext@3.4.6
 	cap-primitives@3.4.6
 	cap-std@3.4.6
+	cast@0.3.0
 	cbc@0.1.2
 	cbindgen@0.28.0
 	cc@1.8.0
@@ -95,6 +104,9 @@ CRATES="
 	chacha20@0.9.1
 	chacha20poly1305@0.10.1
 	chrono@0.4.45
+	ciborium-io@0.2.2
+	ciborium-ll@0.2.2
+	ciborium@0.2.2
 	cipher@0.4.4
 	clap@4.6.7
 	clap_builder@4.6.7
@@ -112,6 +124,7 @@ CRATES="
 	const-random-macro@0.1.16
 	const-random@0.1.18
 	convert_case@0.10.0
+	convert_case@0.11.0
 	core-foundation-sys@0.8.7
 	core-foundation@0.10.0
 	core-foundation@0.9.4
@@ -127,8 +140,11 @@ CRATES="
 	cpufeatures@0.2.17
 	cpufeatures@0.3.1
 	crc32fast@1.5.2
+	criterion-plot@0.8.2
+	criterion@0.8.2
 	crossbeam-deque@0.8.8
 	crossbeam-epoch@0.9.21
+	crossbeam-queue@0.3.14
 	crossbeam-utils@0.8.23
 	crunchy@0.2.4
 	crypto-common@0.1.7
@@ -199,6 +215,7 @@ CRATES="
 	freetype-sys@0.20.1
 	fs-set-times@0.20.3
 	futures-channel@0.3.34
+	futures-concurrency@7.7.1
 	futures-core@0.3.34
 	futures-executor@0.3.34
 	futures-io@0.3.34
@@ -231,6 +248,7 @@ CRATES="
 	gpui-fast-windows@0.1.13
 	gpui-fast@0.1.13
 	gpui-pre-apple@0.3.11
+	gpui-pre-bench-metrics@0.3.11
 	gpui-pre-collections@0.3.11
 	gpui-pre-derive-refineable@0.3.11
 	gpui-pre-http-client@0.3.11
@@ -298,6 +316,7 @@ CRATES="
 	is-docker@0.2.0
 	is-wsl@0.4.0
 	is_terminal_polyfill@1.70.2
+	itertools@0.13.0
 	itertools@0.14.0
 	itoa@1.0.18
 	jni-sys-macros@0.4.1
@@ -411,12 +430,14 @@ CRATES="
 	once_cell@1.21.4
 	once_cell_polyfill@1.70.2
 	oo7@0.6.0
+	oorandom@11.1.5
 	opaque-debug@0.3.1
 	open@5.4.4
 	option-ext@0.2.0
 	ordered-float@5.5.1
 	ordered-stream@0.2.0
 	os_pipe@1.2.3
+	page_size@0.6.0
 	parking@2.2.1
 	parking_lot@0.12.5
 	parking_lot_core@0.9.12
@@ -426,6 +447,9 @@ CRATES="
 	pathfinder_simd@0.5.6
 	pbkdf2@0.12.2
 	percent-encoding@2.3.2
+	perf-event-data@0.1.8
+	perf-event-open-sys2@5.0.6
+	perf-event2@0.7.4
 	petgraph@0.8.3
 	phf@0.11.3
 	phf@0.13.1
@@ -441,14 +465,19 @@ CRATES="
 	pin-project@1.1.13
 	piper@0.2.5
 	pkg-config@0.3.34
+	plotters-backend@0.3.7
+	plotters-svg@0.3.7
+	plotters@0.3.7
 	png@0.17.16
 	png@0.18.1
 	polling@3.11.0
+	pollster@0.2.5
 	pollster@0.4.0
 	poly1305@0.8.0
 	polycool@0.4.0
 	portable-atomic-util@0.2.8
 	portable-atomic@1.15.0
+	postage@0.5.0
 	postcard@1.1.3
 	potential_utf@0.1.6
 	powerfmt@0.2.1
@@ -459,6 +488,8 @@ CRATES="
 	proc-macro2@1.0.107
 	profiling-procmacros@1.0.18
 	profiling@1.0.18
+	proptest-macro@0.6.0
+	proptest@1.12.0
 	prost-build@0.14.4
 	prost-derive@0.14.4
 	prost-reflect@0.16.5
@@ -471,6 +502,7 @@ CRATES="
 	pulp@0.22.3
 	pxfm@0.1.30
 	qoi@0.4.1
+	quick-error@1.2.3
 	quick-error@2.0.1
 	quick-xml@0.41.0
 	quinn-proto@0.11.19
@@ -488,6 +520,7 @@ CRATES="
 	rand_core@0.6.4
 	rand_core@0.9.5
 	rand_pcg@0.10.2
+	rand_xorshift@0.5.0
 	range-alloc@0.1.5
 	rangemap@1.8.0
 	rav1e@0.8.1
@@ -524,6 +557,7 @@ CRATES="
 	rustls-webpki@0.103.16
 	rustls@0.23.46
 	rustversion@1.0.23
+	rusty-fork@0.3.1
 	rustybuzz@0.20.1
 	ruzstd@0.9.1
 	ryu@1.0.23
@@ -607,6 +641,7 @@ CRATES="
 	tiny-skia-path@0.11.4
 	tiny-skia@0.11.4
 	tinystr@0.8.5
+	tinytemplate@1.2.1
 	tinyvec@1.13.3
 	tokio-macros@2.7.2
 	tokio-rustls@0.26.6
@@ -635,6 +670,7 @@ CRATES="
 	typed-path@0.13.0
 	typenum@1.20.1
 	uds_windows@1.2.1
+	unarray@0.1.4
 	unicase@2.10.0
 	unicode-bidi-mirroring@0.4.0
 	unicode-bidi@0.3.18
@@ -662,6 +698,7 @@ CRATES="
 	version_check@0.9.5
 	vswhom-sys@0.1.3
 	vswhom@0.1.0
+	wait-timeout@0.2.1
 	waker-fn@1.2.0
 	walkdir@2.5.0
 	want@0.3.2

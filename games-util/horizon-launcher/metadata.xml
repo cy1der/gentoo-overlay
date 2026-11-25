@@ -3,6 +3,7 @@
 <pkgmetadata>
 	<upstream>
 		<remote-id type="github">horizon-rust/horizon</remote-id>
+		<remote-id type="sourceforge">horizon-rust.mirror</remote-id>
 		<bugs-to>https://github.com/horizon-rust/horizon/issues</bugs-to>
 		<changelog>https://github.com/horizon-rust/horizon/releases?q=launcher</changelog>
 		<doc>https://playhorizon.dev/docs/</doc>

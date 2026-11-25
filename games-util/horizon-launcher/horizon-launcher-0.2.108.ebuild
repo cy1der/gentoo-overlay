@@ -238,30 +238,30 @@ CRATES="
 	glow@0.17.0
 	glutin_wgl_sys@0.6.1
 	gpu-allocator@0.28.0
-	gpui-fast-apple@0.1.13
-	gpui-fast-linux@0.1.13
-	gpui-fast-macos@0.1.13
-	gpui-fast-macros@0.1.13
-	gpui-fast-platform@0.1.13
-	gpui-fast-web@0.1.13
-	gpui-fast-wgpu@0.1.13
-	gpui-fast-windows@0.1.13
-	gpui-fast@0.1.13
-	gpui-pre-apple@0.3.11
-	gpui-pre-bench-metrics@0.3.11
-	gpui-pre-collections@0.3.11
-	gpui-pre-derive-refineable@0.3.11
-	gpui-pre-http-client@0.3.11
-	gpui-pre-ios@0.3.11
-	gpui-pre-macros@0.3.11
-	gpui-pre-refineable@0.3.11
-	gpui-pre-scheduler@0.3.11
-	gpui-pre-shared-string@0.3.11
-	gpui-pre-sum-tree@0.3.11
-	gpui-pre-util@0.3.11
-	gpui-pre-ztracing-macro@0.3.11
-	gpui-pre-ztracing@0.3.11
-	gpui-pre@0.3.11
+	gpui-fast-apple@0.1.15
+	gpui-fast-linux@0.1.15
+	gpui-fast-macos@0.1.15
+	gpui-fast-macros@0.1.15
+	gpui-fast-platform@0.1.15
+	gpui-fast-web@0.1.15
+	gpui-fast-wgpu@0.1.15
+	gpui-fast-windows@0.1.15
+	gpui-fast@0.1.15
+	gpui-pre-apple@0.3.12
+	gpui-pre-bench-metrics@0.3.12
+	gpui-pre-collections@0.3.12
+	gpui-pre-derive-refineable@0.3.12
+	gpui-pre-http-client@0.3.12
+	gpui-pre-ios@0.3.12
+	gpui-pre-macros@0.3.12
+	gpui-pre-refineable@0.3.12
+	gpui-pre-scheduler@0.3.12
+	gpui-pre-shared-string@0.3.12
+	gpui-pre-sum-tree@0.3.12
+	gpui-pre-util@0.3.12
+	gpui-pre-ztracing-macro@0.3.12
+	gpui-pre-ztracing@0.3.12
+	gpui-pre@0.3.12
 	half@2.7.1
 	harfrust@0.5.2
 	hash32@0.3.1
@@ -552,7 +552,7 @@ CRATES="
 	rustc-hash@2.1.3
 	rustc_version@0.4.1
 	rustix-linux-procfs@0.1.1
-	rustix@1.1.5
+	rustix@1.1.6
 	rustls-pki-types@1.15.1
 	rustls-webpki@0.103.16
 	rustls@0.23.46
@@ -867,6 +867,8 @@ HOMEPAGE="
 SRC_URI="
 	https://github.com/horizon-rust/horizon/archive/refs/tags/launcher@${PV}.tar.gz
 		-> ${P}.tar.gz
+	https://downloads.sourceforge.net/project/horizon-rust.mirror/launcher%40${PV}/Horizon%20launcher%20${PV}%20source%20code.tar.gz
+		-> ${P}.tar.gz
 	${CARGO_CRATE_URIS}
 "
 S="${WORKDIR}/${P}/launcher"
@@ -897,6 +899,18 @@ RDEPEND="
 	x11-misc/xdg-utils
 "
 BDEPEND="virtual/pkgconfig"
+
+src_unpack() {
+	cargo_src_unpack
+
+	# The SourceForge mirror archive uses another top-level directory name
+	local dir=( "${WORKDIR}"/horizon-rust-horizon-*/ )
+	if [[ -d ${dir[0]} ]]; then
+		[[ ${#dir[@]} -eq 1 ]] || die "unexpected archive layout"
+		rm -r "${WORKDIR}/${P}" || die
+		mv "${dir[0]}" "${WORKDIR}/${P}" || die
+	fi
+}
 
 src_compile() {
 	# Client ID is Horizon's own public Azure app (docs/microsoft-account.md)

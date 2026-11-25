@@ -107,8 +107,13 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
    so it can still be merged.
 
 Mention `@claude` in any issue or PR comment (owner only) to have Claude work
-on it interactively (`.github/workflows/claude.yml`). That runs without
-portage, so the CI workflow on the PR does the build check.
+on it interactively (`.github/workflows/claude.yml`). Claude runs on the
+runner next to the same gentoo container (`gentoo.sh setup`, the newest cache,
+restored but never saved). `pkgdev`, `pkgcheck`, `ebuild`, `pycargoebuild`,
+`equery` and `gentoo.sh build|deps` are wrappers in `.github/claude/bin` that
+run in it, so changes to `gentoo.sh` affect `@claude` too. Claude is told to
+regenerate the Manifest, run pkgcheck and build before committing. CI on the
+PR still checks the result.
 
 `.github/workflows/ci.yml` runs `pkgcheck scan --exit error,warning,style` on
 the changed packages and builds the changed ebuilds on every PR, the same way

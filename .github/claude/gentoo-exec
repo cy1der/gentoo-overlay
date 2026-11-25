@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Runs the Gentoo command it is called as (pkgdev, pkgcheck, ebuild, ...) in
+# the gentoo container that .github/workflows/claude.yml starts, so Claude on
+# the runner can use portage. The overlay (/overlay), /var/tmp/portage and
+# /var/cache/distfiles have the same paths on the runner and in the container.
+#
+#   bin/<cmd> -> ../gentoo-exec
+#   gentoo.sh build|deps =<cat/pn>-<ver>    see .github/autobump/gentoo.sh
+set -uo pipefail
+
+cmd=${0##*/}
+if [[ ${cmd} == gentoo.sh ]]; then
+	case ${1:-} in
+		build | deps) ;;
+		*)
+			echo "gentoo.sh: only 'build' and 'deps' are available here" >&2
+			exit 2
+			;;
+	esac
+	cmd=/overlay/.github/autobump/gentoo.sh
+fi
+
+# The checkout is /overlay in the container: translate the working directory
+# and arguments under it. Anything else is passed as is.
+ws=${GITHUB_WORKSPACE:?}
+to_container() {
+	case $1 in
+		"${ws}" | "${ws}"/*) echo "/overlay${1#"${ws}"}" ;;
+		*) echo "$1" ;;
+	esac
+}
+dir=$(to_container "${PWD}")
+args=()
+for arg in "$@"; do
+	args+=("$(to_container "${arg}")")
+done
+
+rc=0
+docker exec -w "${dir}" gentoo "${cmd}" "${args[@]}" || rc=$?
+
+# Files written as root (a Manifest, new ebuilds) stay editable by Claude, and
+# portage's private workdirs and fetched distfiles become readable
+docker exec gentoo sh -c "chown -R $(id -u):$(id -g) /overlay &&
+	chmod -R a+rX /var/tmp/portage /var/cache/distfiles 2> /dev/null" || true
+
+exit "${rc}"

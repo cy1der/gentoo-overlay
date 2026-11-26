@@ -84,8 +84,14 @@ jobs:
               echo "### Problems (the run fails after publishing the rest)"
               jq -r '.errors[] | "- \(.)"' plan.json
             fi
+            if jq -e '(.warnings // []) | length > 0' plan.json > /dev/null; then
+              echo
+              echo "### Warnings (checked with x_fallback)"
+              jq -r '.warnings[] | "- \(.)"' plan.json
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
           jq -r '.errors[] | "::error::\(.)"' plan.json
+          jq -r '(.warnings // [])[] | "::warning::\(.)"' plan.json
 
   bump:
     needs: check

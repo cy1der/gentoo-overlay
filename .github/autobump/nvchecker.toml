@@ -8,6 +8,8 @@
 #   x_signed   GitHub release assets ({version} is replaced) whose detached
 #              .asc signature must verify against x_signing_key (a URL)
 #              before the version is bumped
+#   x_fallback another nvchecker entry, used when the main source fails
+#              (e.g. a mirror). The run still passes, with a warning.
 
 # --- pr: mechanical bumps ---------------------------------------------------
 
@@ -203,6 +205,13 @@ include_regex = '^launcher@\d+(\.\d+)*$'
 prefix = "launcher@"
 # CRATES follows launcher/Cargo.lock, which changes often
 x_mode = "ai"
+
+# The SourceForge mirror has a folder per launcher release, for when the
+# GitHub repository is unavailable (it was suspended in November 2026)
+["games-util/horizon-launcher".x_fallback]
+source = "regex"
+url = "https://sourceforge.net/projects/horizon-rust.mirror/rss?path=/"
+regex = '/launcher@(\d+(?:\.\d+)*)/'
 
 # --- issue: too heavy for a hosted runner, or needs a manual check ---------
 

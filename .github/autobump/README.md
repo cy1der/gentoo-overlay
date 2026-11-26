@@ -25,7 +25,10 @@ dedupe vs PRs/issues          └─ failed or x_mode=ai: Claude, ≤3 rounds,  
    - A problem with one package (an nvchecker source that fails, an entry for
      a package that's gone, an unknown `x_mode`) doesn't stop the others. It's
      listed in the run's summary, and the run fails once everything else is
-     published, so GitHub tells you.
+     published, so GitHub tells you. A source that fails is tried once more
+     first: the entry's `x_fallback` if it has one (the run then only warns,
+     see [Configuring packages](#configuring-packages)), or else the same
+     source again after 30 seconds, for a hiccup upstream.
    - It lists issues and PRs once per run instead of searching for each
      package (the search API allows 30 requests a minute).
    - For entries with `x_signed`, it waits until those release assets have a
@@ -168,6 +171,23 @@ This only decides when to bump. The build verifies the files against the
 overlay's own `sec-keys` package, which a person updates when upstream's keys
 change: give that package `x_mode = "issue"` (see
 `sec-keys/openpgp-keys-brave`).
+
+When upstream's main source can go away (a suspended GitHub repository),
+give the entry an `x_fallback`: another nvchecker entry, such as a mirror,
+that check uses when the main source fails. The run then passes with a
+warning in its summary instead of failing. It can't have `x_` keys of its
+own and doesn't work with `x_signed`. The release list in the PR comes from
+the main source, so while that is down it only has the new version, or
+nothing when the fallback gives no release URL. The ebuild still needs
+a `SRC_URI` that works, so pair it with a mirror there too
+(`games-util/horizon-launcher`):
+
+```toml
+["games-util/horizon-launcher".x_fallback]
+source = "regex"
+url = "https://sourceforge.net/projects/horizon-rust.mirror/rss?path=/"
+regex = '/launcher@(\d+(?:\.\d+)*)/'
+```
 
 `python3 .github/autobump/autobump.py lint` checks the file against the
 overlay. It reports as errors: entries for packages that are gone, unknown

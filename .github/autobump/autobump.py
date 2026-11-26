@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import tomllib
 import urllib.error
 import urllib.parse
@@ -195,9 +196,16 @@ def already_handled(cp, ver, check_issues=True):
 # --- check -------------------------------------------------------------------
 
 
-def nvchecker_results(only):
+# Before checking the packages whose source failed again
+RETRY_SECONDS = 30
+
+
+def run_nvchecker(config, only=""):
+    """nvchecker's results for the entries in the file config, as
+    ({name: event}, {name: [problem, ...]}). Packages that got a version have
+    no problems."""
     exe = shutil.which("nvchecker") or str(Path(sys.executable).parent / "nvchecker")
-    cmd = [exe, "-c", str(CONFIG), "--logger", "json"]
+    cmd = [exe, "-c", str(config), "--logger", "json"]
     if only:
         cmd += ["-e", only]
     with tempfile.NamedTemporaryFile("w", suffix=".toml") as keyfile:
@@ -224,11 +232,72 @@ def nvchecker_results(only):
             if len(message) > 160:
                 message = message[:160] + "..."
             problems.setdefault(event.get("name", "?"), []).append(message)
+    # Warnings about a package that still got a version don't matter
+    return results, {name: msgs for name, msgs in problems.items() if name not in results}
+
+
+def nvchecker_results(only):
+    """nvchecker's results, as ({name: event}, errors, warnings).
+
+    A package whose source fails is checked once more, with its x_fallback
+    source if it has one (a warning when that works), or else the same
+    source again (for a hiccup upstream). Only what still fails is an error.
+    """
+    results, problems = run_nvchecker(CONFIG, only)
+    config = tomllib.loads(CONFIG.read_text())
+    retry = {name: config[name] for name in problems if isinstance(config.get(name), dict)}
+    warnings = []
+    if retry:
+        fallbacks = {name for name, entry in retry.items() if isinstance(entry.get("x_fallback"), dict)}
+        if len(fallbacks) < len(retry):
+            log(f"nvchecker: retrying {', '.join(sorted(set(retry) - fallbacks))} in {RETRY_SECONDS}s")
+            time.sleep(RETRY_SECONDS)
+        again = {name: entry["x_fallback"] if name in fallbacks else entry for name, entry in retry.items()}
+        if "__config__" in config:
+            again["__config__"] = config["__config__"]
+        # Next to the config, which may use relative paths
+        with tempfile.NamedTemporaryFile("w", suffix=".toml", dir=HERE) as tmp:
+            tmp.write(toml_dump(again))
+            tmp.flush()
+            found, still = run_nvchecker(tmp.name)
+        for name, event in found.items():
+            results[name] = event
+            if name in fallbacks:
+                warning = f"{name}: used x_fallback, the main source failed: {'; '.join(problems[name])}"
+                log(warning)
+                warnings.append(warning)
+            else:
+                log(f"nvchecker: {name}: worked the second time")
+            del problems[name]
+        for name, msgs in still.items():
+            if name in problems:
+                problems[name] += [f"{'x_fallback' if name in fallbacks else 'retry'}: {m}" for m in msgs]
     if problems and not results:
         sys.exit("nvchecker could not check any package")
-    # Warnings about a package that still got a version don't matter
-    failed = [f"{name}: nvchecker: {'; '.join(msgs)}" for name, msgs in sorted(problems.items()) if name not in results]
-    return results, failed
+    errors = [f"{name}: nvchecker: {'; '.join(msgs)}" for name, msgs in sorted(problems.items())]
+    return results, errors, warnings
+
+
+def toml_dump(tables):
+    """TOML for {name: {key: value}}, with the values nvchecker entries use."""
+
+    def value(v):
+        if isinstance(v, bool):
+            return "true" if v else "false"
+        if isinstance(v, (int, float)):
+            return str(v)
+        if isinstance(v, str):
+            return json.dumps(v)  # a valid TOML basic string
+        if isinstance(v, list):
+            return "[" + ", ".join(value(x) for x in v) + "]"
+        if isinstance(v, dict):
+            return "{" + ", ".join(f"{json.dumps(k)} = {value(x)}" for k, x in v.items()) + "}"
+        raise ValueError(f"can't write {v!r} as TOML")
+
+    return "".join(
+        f"[{json.dumps(name)}]\n" + "".join(f"{json.dumps(k)} = {value(v)}\n" for k, v in entry.items()) + "\n"
+        for name, entry in tables.items()
+    )
 
 
 def upstream_version(name, entry, listed):
@@ -301,7 +370,7 @@ def cmd_check(args):
         sys.exit("--regenerate needs --only")
     # Problems with single packages. The others are still bumped, and publish
     # fails the run at the end so they get noticed.
-    plan = {"bump": [], "issue": [], "errors": []}
+    plan = {"bump": [], "issue": [], "errors": [], "warnings": []}
     # Also catches what was pushed to main without CI
     lint_errors, lint_warnings = lint()
     for warning in lint_warnings:
@@ -311,7 +380,7 @@ def cmd_check(args):
     config = tomllib.loads(CONFIG.read_text())
     broken = {error.split(":")[0] for error in lint_errors}
     prs = open_prs()
-    results, plan["errors"] = nvchecker_results(args.only)
+    results, plan["errors"], plan["warnings"] = nvchecker_results(args.only)
     plan["errors"] += lint_errors
     for cp, event in sorted(results.items()):
         if cp in broken:
@@ -466,7 +535,7 @@ def plan_item(cp, event, entry, args, prs):
 # --- lint ----------------------------------------------------------------------
 
 # Our own keys in nvchecker.toml, which nvchecker ignores
-OWN_KEYS = {"x_mode", "x_drop_old", "x_signed", "x_signing_key"}
+OWN_KEYS = {"x_mode", "x_drop_old", "x_signed", "x_signing_key", "x_fallback"}
 
 
 def lint():
@@ -494,12 +563,29 @@ def lint():
             errors.append(f"{cp}: x_drop_old must be true or false")
         if "x_signed" in entry or "x_signing_key" in entry:
             errors += [f"{cp}: {e}" for e in lint_signed(entry)]
+        if "x_fallback" in entry:
+            errors += [f"{cp}: {e}" for e in lint_fallback(entry)]
         for key in sorted(entry):
             if key.startswith("x_") and key not in OWN_KEYS:
                 errors.append(f"{cp}: unknown key {key}, use one of {', '.join(sorted(OWN_KEYS))}")
     for cp in sorted(packages - set(config)):
         warnings.append(f"{cp}: not in {CONFIG.name}, so autobump doesn't check it")
     return errors, warnings
+
+
+def lint_fallback(entry):
+    fallback = entry["x_fallback"]
+    if not isinstance(fallback, dict):
+        return ["x_fallback must be a table (an nvchecker entry)"]
+    errors = []
+    if "source" not in fallback:
+        errors.append("x_fallback has no source")
+    if any(key.startswith("x_") for key in fallback):
+        errors.append("x_fallback can't have x_ keys, they go in the package's own table")
+    # Signatures are checked on the GitHub release the main source finds
+    if "x_signed" in entry:
+        errors.append("x_fallback doesn't work with x_signed")
+    return errors
 
 
 def lint_signed(entry):

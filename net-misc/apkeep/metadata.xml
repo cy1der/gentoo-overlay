@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<upstream>
+		<remote-id type="github">EFForg/apkeep</remote-id>
+		<bugs-to>https://github.com/EFForg/apkeep/issues</bugs-to>
+	</upstream>
+	<longdescription>
+		apkeep downloads Android APK files from Google Play, F-Droid or APKPure, either a single
+		app or every app listed in a CSV file, several at a time. It can list and fetch specific
+		versions, download split APKs and OBB expansion files from Google Play, and verifies the
+		signed F-Droid index. Written by the Electronic Frontier Foundation.
+	</longdescription>
+</pkgmetadata>

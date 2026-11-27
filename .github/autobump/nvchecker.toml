@@ -239,6 +239,15 @@ prefix = "v"
 # The patches and the RmlUi pin may change with each release
 x_mode = "ai"
 
+["net-misc/apkeep"]
+source = "github"
+github = "EFForg/apkeep"
+# Tags like apkpure-api-2025-10 aren't versions
+use_max_release = true
+include_regex = '^\d+(\.\d+)+$'
+# CRATES follows Cargo.lock
+x_mode = "ai"
+
 # --- issue: too heavy for a hosted runner, or needs a manual check ---------
 
 ["sci-libs/vtk"]

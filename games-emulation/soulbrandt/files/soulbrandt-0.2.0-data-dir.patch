@@ -1,0 +1,35 @@
+--- a/port/ui/src/des_ui.cpp
++++ b/port/ui/src/des_ui.cpp
+@@ -1452,8 +1452,10 @@
+ // own copy of a save in its own folder) leaves the working folder as it is.
+ void work_in_exe_folder() {
+     if (env_on("DES_KEEP_CWD")) return;
+-    const std::filesystem::path exe = ui::report::program_dir();
++    // Gentoo: the program's folder is read-only, so the game works in the player's data folder
++    const std::filesystem::path exe = ui::report::data_dir();
+     std::error_code ec;
++    if (!exe.empty()) std::filesystem::create_directories(exe, ec);
+     const std::filesystem::path cwd = std::filesystem::current_path(ec);
+     if (exe.empty() || ec || std::filesystem::equivalent(cwd, exe, ec)) return;
+     std::filesystem::directory_iterator user(cwd / "gamedata" / "dev_hdd0" / "home", ec), end;
+@@ -1480,7 +1482,7 @@
+         return;
+     std::error_code ec;
+     const std::filesystem::path here = std::filesystem::current_path(ec);
+-    if (ec || !ui::setup::same_folder(here, ui::report::program_dir())) return;
++    if (ec || !ui::setup::same_folder(here, ui::report::data_dir())) return;
+     const std::time_t now = std::time(nullptr);
+     char when[32] = "";
+     if (const std::tm* t = std::gmtime(&now)) std::strftime(when, sizeof when, "%Y-%m-%dT%H:%M:%SZ", t);
+--- a/port/ui/src/setup_engine.cpp
++++ b/port/ui/src/setup_engine.cpp
+@@ -226,7 +226,8 @@
+ }
+ 
+ std::filesystem::path gamedata_dir() {
+-    const auto dir = report::program_dir();
++    // Gentoo: where the game works (des_ui.cpp's work_in_exe_folder), not beside the read-only program
++    const auto dir = report::data_dir();
+     return dir.empty() ? dir : dir / "gamedata";
+ }
+ 

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<upstream>
+		<remote-id type="github">JonathanDC64/Soulbrandt</remote-id>
+	</upstream>
+	<longdescription>
+		Soulbrandt runs your own copy of Demon's Souls for the PS3 natively on a PC. Its setup lifts
+		the game's PowerPC and SPU code to C and C++ with ps3recomp, and compiles it with clang into
+		a module that the program loads; a runtime written for the game stands in for the PS3's
+		system libraries, and its graphics run on Vulkan (or Direct3D 12 through vkd3d). No game
+		files are included.
+	</longdescription>
+</pkgmetadata>

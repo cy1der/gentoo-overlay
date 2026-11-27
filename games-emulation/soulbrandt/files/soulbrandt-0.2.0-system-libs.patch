@@ -1,0 +1,187 @@
+--- a/ps3recomp/CMakeLists.txt
++++ b/ps3recomp/CMakeLists.txt
+@@ -144,29 +144,13 @@
+ option(PS3RECOMP_UPNP "Build UPnP port mapping (miniupnpc) into the runtime" ON)
+ set(MINIUPNPC_SOURCES "")
+ if(PS3RECOMP_UPNP)
+-    file(GLOB MINIUPNPC_SOURCES CONFIGURE_DEPENDS "third_party/miniupnpc/src/*.c")
+-    # Upstream's own definitions (its CMakeLists.txt): off Windows, socket timeouts, the source address of SSDP
+-    # answers, and the feature macros. Windows keeps the SDK's _WIN32_WINNT (upstream sets XP's), so miniupnpc
+-    # takes its Vista-and-later paths.
+-    set(MINIUPNPC_DEFS MINIUPNP_STATICLIB)
+-    if(NOT WIN32)
+-        list(APPEND MINIUPNPC_DEFS MINIUPNPC_SET_SOCKET_TIMEOUT MINIUPNPC_GET_SRC_ADDR _BSD_SOURCE _DEFAULT_SOURCE)
+-        if(APPLE)
+-            list(APPEND MINIUPNPC_DEFS _DARWIN_C_SOURCE)
+-        elseif(NOT CMAKE_SYSTEM_NAME MATCHES ".*BSD")
+-            list(APPEND MINIUPNPC_DEFS _XOPEN_SOURCE=600)
+-        endif()
+-    endif()
+-    set_source_files_properties(${MINIUPNPC_SOURCES} PROPERTIES
+-        COMPILE_OPTIONS "-w"   # upstream code
+-        COMPILE_DEFINITIONS "${MINIUPNPC_DEFS}"
+-        # include/ for its headers; the folder itself for our miniupnpcstrings.h (see the README)
+-        INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/third_party/miniupnpc/include;${CMAKE_CURRENT_SOURCE_DIR}/third_party/miniupnpc")
++    # Gentoo: the system's miniupnpc, linked below once the library is defined
++    find_package(PkgConfig REQUIRED)
++    pkg_check_modules(MINIUPNPC REQUIRED IMPORTED_TARGET miniupnpc)
+     set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/libs/network/net_upnp.c" PROPERTIES
+-        COMPILE_DEFINITIONS "PS3RECOMP_UPNP;MINIUPNP_STATICLIB"
+-        INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/third_party/miniupnpc/include")
+-    list(APPEND HLE_SOURCES ${MINIUPNPC_SOURCES})
+-    message(STATUS "  UPnP:         port mapping with miniupnpc 2.3.3 (third_party/miniupnpc)")
++        COMPILE_DEFINITIONS "PS3RECOMP_UPNP"
++        INCLUDE_DIRECTORIES "${MINIUPNPC_INCLUDEDIR}/miniupnpc")
++    message(STATUS "  UPnP:         port mapping with miniupnpc ${MINIUPNPC_VERSION} (the system's)")
+ else()
+     message(STATUS "  UPnP:         off (net_upnp.c says \"UPnP not built in\")")
+ endif()
+@@ -220,6 +204,10 @@
+     "${CMAKE_CURRENT_SOURCE_DIR}/include"
+ )
+ 
++if(PS3RECOMP_UPNP)
++    target_link_libraries(ps3recomp_runtime PRIVATE PkgConfig::MINIUPNPC)
++endif()
++
+ # Platform-specific link libraries
+ if(WIN32)
+     target_link_libraries(ps3recomp_runtime PRIVATE
+@@ -575,7 +563,7 @@
+             libs/video/gpu/gpu_shader_spv_edit.cpp)
+         target_compile_definitions(ps3recomp_runtime PUBLIC PS3RECOMP_RSX_HAL_SPV=1)
+         target_link_libraries(ps3recomp_runtime PRIVATE
+-            glslang glslang-default-resource-limits SPIRV-Tools-opt SPIRV-Tools-static)
++            glslang::glslang glslang::glslang-default-resource-limits SPIRV-Tools-opt SPIRV-Tools)
+         add_executable(test_gpu_sc_spv EXCLUDE_FROM_ALL
+             libs/video/tests/test_gpu_sc_spv.c
+             runtime/host/host_stubs.c
+--- a/ps3recomp/cmake/gpu_deps.cmake
++++ b/ps3recomp/cmake/gpu_deps.cmake
+@@ -69,38 +69,12 @@
+ endif()
+ option(PS3RECOMP_RSX_HAL_SPV "The shader compile service's spv target (glslang and SPIRV-Tools, fetched)"
+        ${_ps3_gpu_spv_default})
+-if(PS3RECOMP_RSX_HAL_SPV AND (TARGET glslang::glslang OR TARGET SPIRV-Tools-opt))
+-    # A system glslang found earlier (CMakeLists.txt, the Metal path's MSL translation) defines the same target
+-    # names as the pinned one, so the two cannot be in one build.
+-    message(WARNING "PS3RECOMP_RSX_HAL_SPV: a system glslang or SPIRV-Tools is already loaded; the spv target is "
+-                    "not built. Configure without it, or with -DPS3RECOMP_RSX_HAL_SPV=OFF.")
+-    set(PS3RECOMP_RSX_HAL_SPV OFF)
+-endif()
+ if(PS3RECOMP_RSX_HAL_SPV)
+-    set(_ps3_gpu_spv_shared "${BUILD_SHARED_LIBS}")
+-    set(BUILD_SHARED_LIBS OFF)
+-    set(SPIRV_HEADERS_ENABLE_TESTS OFF)
+-    set(SPIRV_HEADERS_ENABLE_INSTALL OFF)
+-    FetchContent_MakeAvailable(spirv_headers)
+-    set(SPIRV-Headers_SOURCE_DIR "${spirv_headers_SOURCE_DIR}")
+-    set(SPIRV_SKIP_TESTS ON)
+-    set(SPIRV_SKIP_EXECUTABLES ON)
+-    set(SKIP_SPIRV_TOOLS_INSTALL ON)
+-    set(SPIRV_WERROR OFF)
+-    set(SPIRV_BUILD_FUZZER OFF)
+-    set(SPIRV_TOOLS_BUILD_STATIC ON)
+-    set(SPIRV_TOOLS_USE_MIMALLOC OFF)
+-    FetchContent_MakeAvailable(spirv_tools)
+-    set(GLSLANG_TESTS OFF)
+-    set(GLSLANG_ENABLE_INSTALL OFF)
+-    set(ENABLE_GLSLANG_BINARIES OFF)
+-    set(ENABLE_GLSLANG_JS OFF)
+-    set(ENABLE_HLSL ON)
+-    set(ENABLE_OPT ON)
+-    set(BUILD_EXTERNAL OFF)
+-    FetchContent_MakeAvailable(glslang)
+-    set(BUILD_SHARED_LIBS "${_ps3_gpu_spv_shared}")
+-    message(STATUS "  Renderer:     the compile service's spv target (glslang, SPIRV-Tools: fetched at their pins)")
++    # Gentoo: the system's SPIRV-Tools and glslang
++    find_package(SPIRV-Tools REQUIRED CONFIG)
++    find_package(SPIRV-Tools-opt REQUIRED CONFIG)
++    find_package(glslang REQUIRED CONFIG)
++    message(STATUS "  Renderer:     the compile service's spv target (glslang ${glslang_VERSION}, SPIRV-Tools: the system's)")
+ endif()
+ 
+ message(STATUS "  Renderer:     GPU layer dependencies declared (Vulkan SDK 1.4.363.0 pins)")
+@@ -116,10 +90,7 @@
+ endif()
+ option(PS3RECOMP_RSX_HAL_VULKAN "The GPU layer's Vulkan backend (libs/video/gpu/gpu_vk*)" ${_ps3_gpu_vk_default})
+ if(PS3RECOMP_RSX_HAL_VULKAN)
+-    # Only the C headers: not Vulkan-Hpp's C++ modules, tests or install rules.
+-    set(VULKAN_HEADERS_ENABLE_MODULE OFF)
+-    set(VULKAN_HEADERS_ENABLE_TESTS OFF)
+-    set(VULKAN_HEADERS_ENABLE_INSTALL OFF)
+-    FetchContent_MakeAvailable(vulkan_headers)
+-    message(STATUS "  Renderer:     the GPU layer's Vulkan backend (Vulkan-Headers ${vulkan_headers_SOURCE_DIR})")
++    # Gentoo: the system's Vulkan-Headers
++    find_package(VulkanHeaders REQUIRED CONFIG)
++    message(STATUS "  Renderer:     the GPU layer's Vulkan backend (Vulkan-Headers ${VulkanHeaders_VERSION}, the system's)")
+ endif()
+--- a/ps3recomp/cmake/sdl3_dep.cmake
++++ b/ps3recomp/cmake/sdl3_dep.cmake
+@@ -45,6 +45,14 @@
+     if(TARGET SDL3::SDL3-static)
+         return()
+     endif()
++    # Gentoo: the system's shared SDL3, under the name the runtime links
++    if(NOT WIN32)
++        find_package(SDL3 REQUIRED CONFIG COMPONENTS SDL3-shared)
++        add_library(SDL3::SDL3-static INTERFACE IMPORTED GLOBAL)
++        set_target_properties(SDL3::SDL3-static PROPERTIES INTERFACE_LINK_LIBRARIES SDL3::SDL3-shared)
++        message(STATUS "  SDL3:         ${SDL3_VERSION}, the system's")
++        return()
++    endif()
+     set(SDL_SHARED OFF)
+     set(SDL_STATIC ON)
+     set(SDL_TEST_LIBRARY OFF)
+--- a/ps3recomp/libs/video/gpu/gpu_shader_spv.cpp
++++ b/ps3recomp/libs/video/gpu/gpu_shader_spv.cpp
+@@ -41,7 +41,7 @@
+ #endif
+ #include <glslang/Public/ShaderLang.h>
+ #include <glslang/Public/ResourceLimits.h>
+-#include <SPIRV/GlslangToSpv.h>   /* (the source tree's layout: the pinned glslang is built here) */
++#include <glslang/SPIRV/GlslangToSpv.h>   /* Gentoo: the installed layout */
+ #include <glslang/build_info.h>
+ #include <spirv-tools/libspirv.h>
+ 
+--- a/port/CMakeLists.txt
++++ b/port/CMakeLists.txt
+@@ -58,7 +58,18 @@
+ # The file also names SDL3's headers (PS3RECOMP_SDL3_INCLUDE_DIRS), for the
+ # port's own SDL code off Windows: the menus' window, keys and mouse use the
+ # SDL3 the runtime links, never a second SDL.
++# Gentoo: the system libraries the runtime links. Its file lists only the static libraries built with it, so they are
++# named here. SDL3's headers are in the default include path (the UI takes SDL3::Headers itself).
++find_package(SDL3 REQUIRED CONFIG COMPONENTS SDL3-shared)
++find_package(SPIRV-Tools REQUIRED CONFIG)
++find_package(SPIRV-Tools-opt REQUIRED CONFIG)
++find_package(glslang REQUIRED CONFIG)
++find_package(PkgConfig REQUIRED)
++pkg_check_modules(DES_MINIUPNPC REQUIRED IMPORTED_TARGET miniupnpc)
++set(DES_SYSTEM_RUNTIME_DEPS glslang::glslang glslang::glslang-default-resource-limits SPIRV-Tools-opt SPIRV-Tools
++    PkgConfig::DES_MINIUPNPC SDL3::SDL3-shared)
+ function(des_runtime_deps target lib)
++    set_property(TARGET ${target} APPEND PROPERTY INTERFACE_LINK_LIBRARIES ${DES_SYSTEM_RUNTIME_DEPS})
+     get_filename_component(_dir "${lib}" DIRECTORY)
+     set(_file "${_dir}/ps3recomp_runtime_deps.cmake")
+     if(NOT EXISTS "${_file}")
+--- a/port/ui/CMakeLists.txt
++++ b/port/ui/CMakeLists.txt
+@@ -15,15 +15,8 @@
+ foreach(dep ZLIB BZIP2 PNG HARFBUZZ BROTLI)
+   set(FT_DISABLE_${dep} ON CACHE BOOL "" FORCE)
+ endforeach()
+-# By commit (a tag can be moved; a commit cannot), so not shallow: a shallow clone works with tag names only.
+-FetchContent_Declare(freetype
+-  GIT_REPOSITORY https://github.com/freetype/freetype.git
+-  GIT_TAG 0a0221a1347e2f1e07c395263540026e9a0aa7c7   # VER-2-14-3
+-  EXCLUDE_FROM_ALL)
+-FetchContent_MakeAvailable(freetype)
+-if(NOT TARGET Freetype::Freetype)
+-  add_library(Freetype::Freetype ALIAS freetype)   # what RmlUi looks for
+-endif()
++# Gentoo: the system's FreeType
++find_package(Freetype REQUIRED)
+ 
+ # ---- RmlUi (MIT) ----
+ set(RMLUI_SAMPLES OFF CACHE BOOL "" FORCE)

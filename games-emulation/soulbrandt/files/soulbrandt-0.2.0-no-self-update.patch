@@ -1,0 +1,11 @@
+--- a/port/ui/src/updates.cpp
++++ b/port/ui/src/updates.cpp
+@@ -119,6 +119,8 @@
+ }
+ 
+ bool possible() {
++    // Gentoo: updates come through the package manager, and the install folder isn't the player's to change
++    if (!env_set("DES_UPDATE_FEED")) return false;
+     if (!plain_version(this_version())) return false;
+     const bool test = env_set("DES_UPDATE_FEED");
+     if (settings::harness_run() && !test) return false;

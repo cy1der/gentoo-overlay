@@ -154,6 +154,12 @@ use_latest_release = true
 prefix = "v"
 x_mode = "pr"
 
+["app-emulation/vkd3d"]
+source = "regex"
+url = "https://dl.winehq.org/vkd3d/source/"
+regex = 'vkd3d-(\d+(?:\.\d+)+)\.tar\.xz'
+x_mode = "pr"
+
 # --- ai: patches, vendored crates or bundled deps ----------------------------
 
 ["net-vpn/proton-vpn-daemon"]

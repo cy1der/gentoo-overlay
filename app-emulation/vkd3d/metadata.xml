@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<longdescription>
+		vkd3d is Wine's implementation of Direct3D 12 on top of Vulkan, built as native
+		libraries: libvkd3d (the D3D12 API), libvkd3d-shader (shader translation and the HLSL
+		compiler) and libvkd3d-utils. Not to be confused with vkd3d-proton.
+	</longdescription>
+	<use>
+		<flag name="ncurses">Colour the output of vkd3d-compiler and vkd3d-dxbc with <pkg>sys-libs/ncurses</pkg></flag>
+		<flag name="spirv-tools">Disassemble and validate SPIR-V output with <pkg>dev-util/spirv-tools</pkg></flag>
+	</use>
+	<upstream>
+		<bugs-to>https://bugs.winehq.org/</bugs-to>
+	</upstream>
+</pkgmetadata>

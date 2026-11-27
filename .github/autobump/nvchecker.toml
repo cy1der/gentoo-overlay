@@ -219,6 +219,16 @@ source = "regex"
 url = "https://sourceforge.net/projects/horizon-rust.mirror/rss?path=/"
 regex = '/launcher@(\d+(?:\.\d+)*)/'
 
+["games-util/ps3dec"]
+source = "github"
+github = "Redrrx/ps3dec"
+# Some older releases are tagged without the v; dev-* tags aren't versions
+use_max_release = true
+include_regex = '^v?\d+(\.\d+)+$'
+prefix = "v"
+# CRATES follows Cargo.lock
+x_mode = "ai"
+
 ["games-emulation/soulbrandt"]
 source = "github"
 github = "JonathanDC64/Soulbrandt"

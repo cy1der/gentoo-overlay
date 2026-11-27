@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<upstream>
+		<remote-id type="github">Redrrx/ps3dec</remote-id>
+	</upstream>
+	<longdescription>
+		PS3Dec decrypts PlayStation 3 Blu-ray disc images dumped in Redump's format, given the
+		disc's decryption key (a .dkey file or its 32 hex digits). It handles several images at
+		once in a terminal UI, and resumes an interrupted decryption. A Rust remake of the
+		original PS3Dec.
+	</longdescription>
+</pkgmetadata>

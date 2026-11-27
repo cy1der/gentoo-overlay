@@ -1,0 +1,79 @@
+Download paid apps the account owns from Google Play.
+
+Play answers /purchase for a paid app with HTTP 400 whether or not the
+account owns it, so gpapi got no delivery token and gave up with
+InvalidApp. Ask /delivery without a token in that case, as Aurora Store
+does: it serves an owned app and reports status 3 for one that hasn't
+been bought. Say why when Play refuses a delivery.
+
+Upstream treats paid apps as unsupported:
+https://github.com/EFForg/apkeep/issues/190
+
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -474,18 +474,19 @@
+             );
+ 
+             self.execute_request("purchase", Some(params), Some(&[]), headers)
+-                .await?
++                .await
+         };
+-        if let Some(payload) = resp.payload {
+-            if let Some(buy_response) = payload.buy_response {
+-                if let Some(delivery_token) = buy_response.encoded_delivery_token {
+-                    return self
+-                        .delivery(&pkg_name, version_code.clone(), &delivery_token)
+-                        .await
+-                }
+-            }
+-        }
+-        Err(GpapiError::new(GpapiErrorKind::InvalidApp))
++        // Play answers /purchase for a paid app with HTTP 400 whether or not the account
++        // owns it, so there is no delivery token. /delivery without one still serves an
++        // owned app, and reports status 3 for one the account has not bought (this is
++        // what Aurora Store does).
++        let delivery_token = resp
++            .ok()
++            .and_then(|resp| resp.payload)
++            .and_then(|payload| payload.buy_response)
++            .and_then(|buy_response| buy_response.encoded_delivery_token)
++            .filter(|delivery_token| !delivery_token.is_empty());
++        self.delivery(&pkg_name, version_code, delivery_token).await
+     }
+ 
+ 
+@@ -494,10 +495,9 @@
+         &self,
+         pkg_name: S,
+         mut version_code: Option<i64>,
+-        delivery_token: S,
++        delivery_token: Option<String>,
+     ) -> Result<DownloadInfo, GpapiError> {
+         let pkg_name = pkg_name.into();
+-        let delivery_token = delivery_token.into();
+         if self.auth_token.is_none() {
+             return Err(GpapiError::new(GpapiErrorKind::LoginRequired));
+         }
+@@ -510,12 +510,21 @@
+             req.insert("ot", String::from("1"));
+             req.insert("doc", pkg_name.clone());
+             req.insert("vc", version_code_string);
+-            req.insert("dtok", delivery_token);
++            if let Some(delivery_token) = delivery_token {
++                req.insert("dtok", delivery_token);
++            }
+             self.execute_request("delivery", Some(req), None, self.get_default_headers()?)
+                 .await?
+         };
+         if let Some(payload) = resp.payload {
+             if let Some(delivery_response) = payload.delivery_response {
++                match delivery_response.status {
++                    Some(1) | None => {}
++                    Some(2) | Some(9) => eprintln!("{} is not available for this device", pkg_name),
++                    Some(3) => eprintln!("{} has not been purchased by this account", pkg_name),
++                    Some(7) => eprintln!("{} has been removed from Google Play", pkg_name),
++                    Some(status) => eprintln!("Google Play refused to deliver {} (status {})", pkg_name, status),
++                }
+                 if let Some(app_delivery_data) = delivery_response.app_delivery_data {
+                     let mut splits = Vec::new();
+                     for app_split_delivery_data in app_delivery_data.split_delivery_data {

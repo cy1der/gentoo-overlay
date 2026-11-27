@@ -345,6 +345,15 @@ DEPEND="
 RDEPEND="${DEPEND}"
 BDEPEND="virtual/pkgconfig"
 
+src_prepare() {
+	# Download paid apps the account owns, upstream won't (issue #190)
+	pushd "${ECARGO_VENDOR}"/gpapi-6.1.0 >/dev/null || die
+	eapply "${FILESDIR}"/${PN}-1.1.0-gpapi-owned-paid-apps.patch
+	popd >/dev/null || die
+
+	default
+}
+
 src_configure() {
 	# Link the system zstd instead of the bundled copy
 	export ZSTD_SYS_USE_PKG_CONFIG=1

@@ -160,6 +160,15 @@ url = "https://dl.winehq.org/vkd3d/source/"
 regex = 'vkd3d-(\d+(?:\.\d+)+)\.tar\.xz'
 x_mode = "pr"
 
+# src_unpack fails when upstream pins new Skiko/JNA/OSHI jars, so Claude
+# updates their versions then
+["dev-util/morphe-desktop-bin"]
+source = "github"
+github = "MorpheApp/morphe-desktop"
+use_latest_release = true
+prefix = "v"
+x_mode = "pr"
+
 # --- ai: patches, vendored crates or bundled deps ----------------------------
 
 ["net-vpn/proton-vpn-daemon"]
